@@ -44,10 +44,14 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             transform: translateY(-1px);
         }
+        /* ESTILO PARA TRANSAÇÃO JÁ SUBMETIDA (VERDE) */
         .transaction-card.submitted {
-            border-left: 5px solid #10b981; /* Verde */
+            background-color: #d1fae5; /* Verde claro de fundo */
+            border: 1px solid #10b981; /* Borda Verde */
             opacity: 0.7;
             pointer-events: none; /* Desativa cliques após submissão */
+            box-shadow: none;
+            cursor: default;
         }
         .transaction-card.pending {
             border-left: 5px solid #f59e0b; /* Amarelo */
@@ -149,11 +153,11 @@
         // CONFIGURAÇÃO DO GOOGLE FORMS E IDs DE ENTRADA
         // =========================================================================
 
-        // URL CORRETO: Este ID foi validado nos testes de depuração (termina em 'TceUZ...').
+        // ID DO GOOGLE FORMS
         const FORMS_ID = '1FAIpQLSfKuL6nzTceUZfUzidBwhizoFLBC3vyYT_OmncWfN99QTwhKQ';
         const FORMS_URL = `https://docs.google.com/forms/d/e/${FORMS_ID}/formResponse`;
         
-        // IDs confirmados pelo link de pré-preenchimento
+        // Mapeamento dos campos do formulário para os nomes das colunas (entry.XXX)
         const FORMS_FIELD_MAP = {
             'entry.1696802376': 'Date',          // Data (YYYY-MM-DD)
             'entry.670590371': 'Merchant',       // Comerciante/Descrição
@@ -196,58 +200,46 @@
         // =========================================================================
 
         /**
-         * Analisa o arquivo CSV para extrair transações.
-         * Assume que a primeira linha é o cabeçalho.
+         * Analisa o arquivo CSV para extrair transações (Assumindo formato Curve).
          */
         function parseCSV(text) {
-            // Remove quebras de linha no final e divide as linhas
             const lines = text.trim().split('\n');
             if (lines.length < 2) return [];
 
-            // Assume o cabeçalho (Curve CSV headers)
             const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
             const dataLines = lines.slice(1);
             const results = [];
 
-            // Encontra os índices das colunas relevantes
             const indices = {
                 date: headers.indexOf('Date (YYYY-MM-DD as UTC)'),
                 merchant: headers.indexOf('Merchant'),
                 amount: headers.indexOf('Txn Amount (Funding Card)'),
                 currency: headers.indexOf('Txn Currency (Funding Card)'),
-                // O índice da categoria pode ser usado para pré-preenchimento do Forms, mas não é usado para auto-categorização aqui
-                // category: headers.indexOf('Category'), 
             };
             
-            // Verifica se as colunas essenciais existem
             if (indices.date === -1 || indices.merchant === -1 || indices.amount === -1 || indices.currency === -1) {
-                showToast("Erro: O arquivo CSV não contém todas as colunas essenciais (Data, Merchant, Txn Amount, Txn Currency).", 'error');
-                console.error("CSV Headers missing required fields:", headers);
+                showToast("Erro: O CSV não contém colunas essenciais (Data, Merchant, Txn Amount, Txn Currency).", 'error');
                 return [];
             }
 
             dataLines.forEach((line, index) => {
-                // Split robusto para lidar com vírgulas dentro de campos entre aspas
                 const values = line.match(/(".*?"|[^",\r\n]+)(?=\s*,|\s*$)/g) || [];
                 const row = values.map(v => v.trim().replace(/"/g, ''));
 
-                // Ignora linhas incompletas ou não transacionais (como 'Curve Cash' ou 'REFUNDED')
+                // Filtra: Apenas gastos (valor negativo) em EUR, e ignora cashback
                 if (row.length <= indices.amount || 
-                    row[indices.amount] === '0.00' || 
                     row[indices.amount].startsWith('-') === false || 
                     row[indices.currency] !== 'EUR' ||
-                    row[indices.merchant].startsWith('Curve Cash:') // Ignora transações de cashback
+                    row[indices.merchant].startsWith('Curve Cash:') 
                 ) {
-                    return; // Ignora esta transação
+                    return; 
                 }
 
-                // Extrai os dados
                 const date = row[indices.date];
                 const merchant = row[indices.merchant];
-                // Remove o sinal de negativo e garante um float para validação
                 const amount = parseFloat(row[indices.amount].replace('-', '')); 
 
-                if (isNaN(amount) || amount <= 0) return; // Ignora se o valor não for válido
+                if (isNaN(amount) || amount <= 0) return; 
 
                 results.push({
                     id: `txn-${date}-${index}`,
@@ -256,7 +248,7 @@
                     amount: amount,
                     category: determineCategory(merchant, categories),
                     isSubmitted: false,
-                    isSelected: true, // Começa selecionado para submissão
+                    isSelected: true, 
                 });
             });
 
@@ -286,7 +278,6 @@
          * Constrói o payload de submissão.
          */
         function buildFormsPayload(transaction, useCommaDecimal) {
-            // O Forms geralmente aceita 'YYYY-MM-DD'
             const date = transaction.date; 
             
             // Formata o valor, garantindo o separador correto
@@ -294,7 +285,6 @@
                 ? transaction.amount.toFixed(2).replace('.', ',') 
                 : transaction.amount.toFixed(2);
             
-            // Monta o objeto de dados com os IDs de entrada (entry.XXX)
             const payload = {
                 [FORMS_FIELD_MAP['entry.1696802376']]: date,
                 [FORMS_FIELD_MAP['entry.670590371']]: transaction.merchant,
@@ -316,8 +306,6 @@
          */
         async function submitTransactionWithRetry(transaction) {
             const MAX_RETRIES = 3;
-            let lastError = null;
-
             // Tenta submeter primeiro com ponto decimal e, se falhar, tenta com vírgula.
             const decimalFormats = [
                 { useComma: false, name: 'Ponto Decimal (.)' },
@@ -326,7 +314,7 @@
 
             for (const format of decimalFormats) {
                 for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-                    const delay = Math.pow(2, attempt) * 100 + Math.random() * 100; // 0.3s, 0.5s, 0.9s
+                    const delay = Math.pow(2, attempt) * 100 + Math.random() * 100;
                     
                     if (attempt > 1) {
                         await new Promise(resolve => setTimeout(resolve, delay));
@@ -340,7 +328,6 @@
                         console.log('Payload Enviado (entry.XXX):', payload);
                         console.groupEnd();
                         
-                        // O Google Forms exige modo 'no-cors' para submissão programática
                         const response = await fetch(FORMS_URL, {
                             method: 'POST',
                             mode: 'no-cors', 
@@ -350,14 +337,11 @@
                             body: formData.toString()
                         });
 
-                        // No modo 'no-cors', se o fetch retornar sem erro de rede, consideramos sucesso.
-                        // O Forms rejeita silenciosamente se os IDs estiverem errados, mas não há como saber aqui.
-                        console.log(`[Forms Submissão: ${transaction.id}] Tentativa ${attempt} enviada com sucesso (modo no-cors).`);
-                        return true; // Sucesso na submissão (do ponto de vista do navegador)
+                        // No modo 'no-cors', consideramos sucesso se não houver erro de rede
+                        return true; 
 
                     } catch (error) {
-                        lastError = `Erro na Tentativa ${attempt}: ${error.message}`;
-                        console.error(`[Forms Submissão: ${transaction.id}] ${lastError}`);
+                        console.error(`[Forms Submissão: ${transaction.id}] Erro na Tentativa ${attempt}: ${error.message}`);
                         if (attempt === MAX_RETRIES) {
                             console.error(`[Forms Submissão: ${transaction.id}] Falha após ${MAX_RETRIES} retentativas.`);
                             return false; 
@@ -389,39 +373,42 @@
 
             for (let i = 0; i < totalToSubmit; i++) {
                 const transaction = pendingTransactions[i];
-                submitStatusP.textContent = `Processando: ${i + 1} de ${totalToSubmit} (${transaction.merchant}, ${transaction.amount} €)...`;
+                submitStatusP.textContent = `Processando: ${i + 1} de ${totalToSubmit} (${transaction.merchant}, ${transaction.amount.toFixed(2)} €)...`;
                 
-                // Encontra o elemento do cartão para atualizar o status
+                // Encontra o elemento do cartão para atualização visual
                 const cardElement = document.getElementById(transaction.id);
 
                 if (await submitTransactionWithRetry(transaction)) {
+                    // SUCESSO
                     transaction.isSubmitted = true;
                     submittedCount++;
                     
                     if (cardElement) {
+                         // Remove classes de ativo/pendente e adiciona a classe de submetido
                          cardElement.classList.remove('pending', 'active');
                          cardElement.classList.add('submitted');
+                         // Remove o handler de clique para evitar re-seleção
+                         cardElement.onclick = null; 
                     }
                     submitAllButton.textContent = `Submetendo ${submittedCount} de ${totalToSubmit}...`;
                 } else {
-                    // Falha na submissão: marca como não selecionado para tentar manualmente depois
+                    // FALHA
                     transaction.isSelected = false;
                     if (cardElement) {
+                        // Marca visualmente a falha
                         cardElement.classList.remove('pending', 'active');
-                        cardElement.classList.add('border-red-500', 'bg-red-50');
+                        cardElement.classList.add('border-red-500', 'bg-red-100');
                         cardElement.querySelector('.text-sm').textContent += ' (FALHA na Submissão)';
                     }
-                    showToast(`Falha na submissão da transação: ${transaction.merchant}. Verifique o log.`, 'error');
+                    showToast(`Falha na submissão: ${transaction.merchant}. Verifique o log.`, 'error');
                 }
                 
-                // Pequeno delay entre submissões para não sobrecarregar o Forms
                 await new Promise(resolve => setTimeout(resolve, 50));
             }
 
             // Finalização
             isSubmitting = false;
-            submitAllButton.disabled = false;
-            updateUI();
+            updateUI(); // Chama o UI update final para atualizar contagens e estado do botão
             
             showToast(`Processo concluído. ${submittedCount} transações submetidas.`, 'success');
             submitStatusP.textContent = `Submissão concluída. ${submittedCount} transações adicionadas.`;
@@ -447,7 +434,18 @@
             transactions.forEach(t => {
                 const card = document.createElement('div');
                 card.id = t.id;
-                card.className = `transaction-card ${t.isSubmitted ? 'submitted' : 'pending'} ${t.isSelected && !t.isSubmitted ? 'active' : ''}`;
+                
+                // Define a classe inicial com base no estado
+                let cardClasses = 'transaction-card';
+                if (t.isSubmitted) {
+                    cardClasses += ' submitted';
+                } else {
+                    cardClasses += ' pending';
+                    if (t.isSelected) {
+                        cardClasses += ' active';
+                    }
+                }
+                card.className = cardClasses;
                 
                 card.innerHTML = `
                     <p class="font-bold text-lg text-gray-800">${t.amount.toFixed(2)} €</p>
@@ -502,7 +500,6 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    // Recarrega o mapeamento de categorias
                     categories = JSON.parse(categoryMappingTextarea.value);
                 } catch (err) {
                     showToast("Erro ao analisar o Mapeamento de Categorias. Verifique se o JSON está correto.", 'error');
@@ -510,7 +507,6 @@
                     return;
                 }
 
-                // Analisa o CSV
                 transactions = parseCSV(e.target.result);
                 
                 if (transactions.length > 0) {
@@ -531,12 +527,12 @@
         categoryMappingTextarea.addEventListener('change', () => {
              try {
                 categories = JSON.parse(categoryMappingTextarea.value);
-                // Re-categoriza todas as transações após a mudança
-                transactions.forEach(t => {
+                // Re-categoriza transações não submetidas
+                transactions.filter(t => !t.isSubmitted).forEach(t => {
                     t.category = determineCategory(t.merchant, categories);
                 });
                 updateUI();
-                showToast("Mapeamento de categorias atualizado.", 'info');
+                showToast("Mapeamento de categorias atualizado e re-aplicado.", 'info');
             } catch (err) {
                 showToast("Erro: O JSON do mapeamento está inválido.", 'error');
             }

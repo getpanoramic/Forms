@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Despesas</title>
+    <!-- Carrega Tailwind CSS para estilização -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#4f46e5',
+                        'secondary': '#10b981',
+                        'accent': '#f97316',
+                    },
+                },
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        .scrollable-table {
+            max-height: 500px; /* Altura máxima para a lista de transações */
+            overflow-y: auto;
+        }
+        input[type="file"]::file-selector-button {
+            background-color: #4f46e5;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-right: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        input[type="file"]::file-selector-button:hover {
+             background-color: #4338ca; 
+        }
+        /* Ajuste para o bloco de submissão na tabela */
+        .submission-block {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: stretch;
+        }
+    </style>
+    <!-- Carrega PapaParse -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+    <!-- Firebase Imports for Auth (apenas para userId) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.firebaseApp = null;
+        window.db = null;
+        window.auth = null;
+        window.userId = null;
+        window.isAuthReady = false;
+        
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        if (firebaseConfig) {
+            setLogLevel('debug');
+            window.firebaseApp = initializeApp(firebaseConfig);
+            window.db = getFirestore(window.firebaseApp);
+            window.auth = getAuth(window.firebaseApp);
+
+            onAuthStateChanged(window.auth, async (user) => {
+                if (user) {
+                    window.userId = user.uid;
+                } else {
+                    try {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(window.auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(window.auth);
+                        }
+                        window.userId = window.auth.currentUser.uid;
+                    } catch (error) {
+                        console.error("Erro na autenticação do Firebase:", error);
+                        window.userId = `anon-${crypto.randomUUID()}`; 
+                    }
+                }
+                window.isAuthReady = true;
+                if (typeof window.loadFirestoreTransactions === 'function') {
+                    // Mantido, mas sem uso real de Firestore, apenas para a estrutura
+                    window.loadFirestoreTransactions(); 
+                }
+            });
+        }
+        
+        window.initialCsvDataFallback = typeof uploaded_files !== 'undefined' ? (uploaded_files['export.csv'] || uploaded_files[Object.keys(uploaded_files)[0]]) : null;
+
+    </script>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div id="app" class="max-w-7xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-gray-800">📊 Gerenciador Financeiro Pessoal</h1>
+            <p class="text-gray-500 mt-2">Análise de despesas. Submeta transações diretamente para o seu Google Form.</p>
+        </header>
+
+        <!-- Loading / Error Messages -->
+        <div id="statusMessage" class="mb-4 p-4 text-center text-sm font-medium rounded-lg hidden"></div>
+
+        <!-- BLOCO: Configuração do Google Forms -->
+        <div class="mb-8 p-6 bg-white rounded-xl card border border-accent-100">
+            <h2 class="text-2xl font-semibold text-accent mb-4">1. Configuração do Google Form</h2>
+            <p class="text-gray-600 mb-4">Cole o **URL de Pré-preenchimento** do seu Google Form abaixo.</p>
+            
+            <!-- O URL está agora em Base64 para privacidade ao partilhar no GitHub. 
+                 Será descodificado no script JS (utf8_from_b64) no carregamento. -->
+            <input type="url" id="googleFormUrl" 
+                   value="aHR0cHM6Ly9kb2NzLmdvb2dsZS5jb20vZm9ybXMvZC9lLzFGQUlwUUxTZkt1TDZuell0Y2VVWmZVemlkQndoaXpvRkxCQzN2eVlUX09tbmNXZk45OVFUd2hLUS92aWV3Zm9ybT91c3A9cHBybCZlbnRyeS42NzA1OTAzNzE9RGVzJmVudHJ5LjMyMjA0ODAyOD1kZXMmZW50cnkuMTg4Njc1NDMyMT1QYXNzZXMrbWVuc2FpcyZlbnRyeS4xNjk2ODAyMzc2PTIwMjUtMTAtMzA="
+                   required
+                   data-encoded="true"
+                   class="w-full p-2 border border-gray-300 rounded-lg focus:ring-accent focus:border-accent"
+            >
+            <p class="text-xs text-red-500 mt-2 font-semibold">⚠️ O URL deve ter `/viewform?usp=pp_url...`. A submissão será corrigida automaticamente para `/formResponse`.</p>
+        </div>
+
+        <!-- BLOCO: Upload de Arquivo -->
+        <div class="mb-8 p-6 bg-white rounded-xl card border border-gray-100">
+            <h2 class="text-2xl font-semibold text-primary mb-4">2. Carregar Dados CSV</h2>
+            <p class="text-gray-600 mb-4">Selecione o seu ficheiro CSV (ex: `export.csv`) para iniciar a análise.</p>
+            
+            <input type="file" id="csvFileInput" accept=".csv" class="w-full text-sm text-gray-500"/>
+        </div>
+
+        <!-- BLOCO: Adicionar Transação Manualmente -->
+        <div class="mb-8 p-6 bg-white rounded-xl card border border-gray-100">
+            <h2 class="text-2xl font-semibold text-secondary mb-4">3. Adicionar Nova Transação (Submissão Manual)</h2>
+            <form id="newTransactionForm" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                <div class="flex flex-col">
+                    <label for="txnDate" class="text-sm font-medium text-gray-700 mb-1">Data</label>
+                    <input type="date" id="txnDate" required class="p-2 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                </div>
+                <div class="flex flex-col md:col-span-2">
+                    <label for="txnMerchant" class="text-sm font-medium text-gray-700 mb-1">Descrição / Comerciante</label>
+                    <input type="text" id="txnMerchant" placeholder="Ex: Lidl, Netflix, Uber" required class="p-2 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                </div>
+                <div class="flex flex-col">
+                    <label for="txnAmount" class="text-sm font-medium text-gray-700 mb-1">Valor (€)</label>
+                    <input type="number" step="0.01" id="txnAmount" required class="p-2 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                </div>
+                <div class="flex flex-col">
+                    <label for="txnCategory" class="text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                    <select id="txnCategory" required class="p-2 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                        <!-- Options populated by JS -->
+                    </select>
+                </div>
+                <button type="submit" id="submitTransaction" class="md:col-span-5 bg-secondary hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                    Submeter Transação ao Forms
+                </button>
+            </form>
+        </div>
+
+
+        <!-- Filtros e Resumo -->
+        <div class="mb-8 p-6 bg-white rounded-xl card border border-gray-100">
+            <h2 class="text-2xl font-semibold text-primary mb-4">4. Resumo e Filtros</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <!-- Data Range Filter -->
+                <div class="flex flex-col">
+                    <label for="startDate" class="text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
+                    <input type="date" id="startDate" class="p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                </div>
+                <div class="flex flex-col">
+                    <label for="endDate" class="text-sm font-medium text-gray-700 mb-1">Data Final</label>
+                    <input type="date" id="endDate" class="p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                </div>
+
+                <!-- Category Filter -->
+                <div class="flex flex-col">
+                    <label for="categoryFilter" class="text-sm font-medium text-gray-700 mb-1">Filtrar por Tipo (Categoria)</label>
+                    <select id="categoryFilter" class="p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                        <option value="">Todas as Categorias</option>
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button id="applyFilters" class="w-full bg-primary hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                    Aplicar Filtros
+                </button>
+                <button id="toggleCurveCash" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200" data-state="include">
+                    Excluir Transações Curve Cash
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard de Totais -->
+        <div id="summaryDashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <!-- Cards de resumo serão preenchidos aqui -->
+        </div>
+
+        <!-- Tabela de Transações -->
+        <div class="bg-white p-6 rounded-xl card border border-gray-100">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Transações Detalhadas (Com Auto-Categorização)</h2>
+            <div id="transactionsTableContainer" class="scrollable-table">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky top-0 z-10">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fonte</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição (Merchant)</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Valor (€)</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria Sugerida</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Linhas de transação serão preenchidas aqui -->
+                    </tbody>
+                </table>
+                <div id="noDataMessage" class="hidden text-center py-10 text-gray-500">Nenhuma transação encontrada para os filtros aplicados.</div>
+            </div>
+        </div>
+        
+        <!-- Mensagem de ID do Usuário (Obrigatório para Apps Colaborativos/Persistentes) -->
+        <div id="userIdDisplay" class="text-xs text-gray-500 text-center mt-4 p-2 bg-gray-100 rounded">
+            Aguardando autenticação...
+        </div>
+
+    </div>
+
+    <script type="module">
+        let allTransactions = []; 
+        let csvTransactions = []; 
+        let filteredTransactions = [];
+        let excludeCurveCash = false; // Novo estado para o filtro Curve Cash
+
+        // CATEGORIAS MESTRE (FORNECIDAS PELO UTILIZADOR)
+        const CATEGORIES_PT = [
+            "Passes mensais", "Jantares", "Subscrições", "Shopping", "Saúde",
+            "Finanças", "Entretenimento", "Groceries", "Diversos", "Viagens",
+            "Crédito/Entrada", "Roupa", "Investimento", "Almoços", "Cafés/Lanches",
+            "Casa", "Hobbies"
+        ];
+        
+        // Mapeamento de keywords do Comerciante para a Categoria MESTRE
+        const KEYWORD_MAP = {
+            "Groceries": ['lidl', 'pingo doce', 'continente', 'jumbo', 'auchan', 'mercadona', 'alcampo'],
+            "Subscrições": ['netflix', 'spotify', 'prime', 'apple', 'google *services', 'adobe', 'microsoft', 'patreon'],
+            "Shopping": ['amazon', 'ebay', 'fnac', 'worten', 'decathlon'],
+            "Saúde": ['farmacia', 'hospital', 'clinica', 'medico', 'dentista', 'fisiocare'],
+            "Viagens": ['uber', 'bolt', 'tap', 'ryanair', 'booking', 'airbnb', 'comboios'],
+            "Roupa": ['zara', 'h&m', 'springfield', 'nike', 'adidas', 'c&a', 'massimo dutti'],
+            "Casa": ['ikea', 'leroy merlin', 'bricomarché', 'eletricidade', 'agua', 'gas'],
+            "Investimento": ['degiro', 'trading', 'etf', 'invest'],
+            "Cafés/Lanches": ['cafe', 'pastelaria', 'starbucks', 'torradinha', 'padaria'],
+            "Passes mensais": ['passe', 'mensal', 'transporte', 'carris', 'metro'],
+            "Jantares": ['restaurante', 'sushi', 'pizza', 'hamburguer', 'marisqueira'],
+            "Almoços": ['restaurante', 'take away', 'fast food'], // Sobrescrito por Jantares se mais específico
+            "Entretenimento": ['cinema', 'bilhetes', 'teatro', 'gaming', 'psn', 'xbox'],
+            "Finanças": ['taxa', 'juros', 'comissao', 'banco'],
+            "Hobbies": ['livraria', 'desporto', 'hobby', 'ginásio', 'biblioteca'],
+        };
+        
+        // Mapeamento de categorias originais do CSV para Português (para fallback e correções)
+        const CSV_TYPE_MAPPING = {
+            "Shopping": "Shopping",
+            "Health": "Saúde",
+            "Travel": "Viagens",
+            "Eating Out": "Almoços",
+            "Groceries": "Groceries",
+            "Subscriptions": "Subscrições",
+            "Services": "Diversos", 
+            "Finance": "Finanças",
+            "Entertainment": "Entretenimento",
+            "Clothing": "Roupa",
+            "Investment": "Investimento",
+            "Miscellaneous": "Diversos",
+            "CPT": "Crédito/Entrada",
+            "Refund": "Crédito/Entrada",
+            "Transport": "Passes mensais",
+            "Restaurants": "Jantares"
+        };
+
+
+        // Elementos de UI
+        const statusMessage = document.getElementById('statusMessage');
+        const csvFileInput = document.getElementById('csvFileInput');
+        const newTransactionForm = document.getElementById('newTransactionForm');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const googleFormUrlInput = document.getElementById('googleFormUrl');
+        const toggleCurveCashButton = document.getElementById('toggleCurveCash');
+        
+        /**
+         * Funções de Utilidade e Status
+         */
+        const arrayBufferToString = (buffer) => new TextDecoder().decode(buffer);
+
+        // NOVO: Descodifica Base64 em string UTF-8
+        function utf8_from_b64(b64) {
+            try {
+                const binaryString = atob(b64);
+                const len = binaryString.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                return new TextDecoder().decode(bytes);
+            } catch (e) {
+                console.error("Error during Base64 to UTF-8 decoding:", e);
+                return b64; // Retorna o valor original em caso de erro
+            }
+        }
+
+        // Mantida: Codifica string UTF-8 em Base64
+        function utf8_to_b64(str) {
+            try {
+                const encoder = new TextEncoder();
+                const utf8Bytes = encoder.encode(str);
+                
+                let binaryString = "";
+                for (let i = 0; i < utf8Bytes.length; i++) {
+                    binaryString += String.fromCharCode(utf8Bytes[i]);
+                }
+                
+                return btoa(binaryString);
+            } catch (e) {
+                console.error("Error during UTF-8 to Base64 conversion:", e);
+                return `ENCODING_ERROR_${Math.random().toString(36).substring(2, 9)}`;
+            }
+        }
+
+        function showStatus(message, type = 'info') {
+            statusMessage.textContent = message;
+            statusMessage.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700', 'bg-yellow-100', 'text-yellow-700');
+            statusMessage.classList.add('block');
+            
+            if (type === 'error') {
+                statusMessage.classList.add('bg-red-100', 'text-red-700');
+            } else if (type === 'success') {
+                statusMessage.classList.add('bg-green-100', 'text-green-700');
+            } else {
+                statusMessage.classList.add('bg-yellow-100', 'text-yellow-700');
+            }
+        }
+        
+        /**
+         * Lógica de Categorização Inteligente
+         * @param {string} merchant - Nome do comerciante.
+         * @param {string} originalCategory - Categoria do CSV original.
+         * @param {number} amount - Valor da transação.
+         * @returns {string} Categoria mapeada em Português.
+         */
+        function getSmartCategory(merchant, originalCategory, amount) {
+            const normalizedMerchant = merchant.toLowerCase();
+
+            // 1. Prioridade máxima: Crédito/Entrada (com base no valor ou Curve Cash)
+            if (amount >= 0 || normalizedMerchant.startsWith('curve cash:')) {
+                return "Crédito/Entrada";
+            }
+            
+            // 2. Mapeamento por Keywords do Comerciante (mais específico)
+            for (const category in KEYWORD_MAP) {
+                for (const keyword of KEYWORD_MAP[category]) {
+                    if (normalizedMerchant.includes(keyword.toLowerCase())) {
+                        // Tratar Jantares e Almoços: Jantares deve ser mais específico
+                        if (category === "Almoços" && normalizedMerchant.includes('restaurante')) {
+                            // Se for restaurante, prefere "Jantares", mas Almoços é o fallback para Eating Out em geral
+                            return "Jantares";
+                        }
+                        return category;
+                    }
+                }
+            }
+
+            // 3. Mapeamento por Categoria do CSV (Fallback)
+            const mappedFromCsv = CSV_TYPE_MAPPING[originalCategory] || "Diversos";
+            
+            // 4. Se o mapeamento do CSV é válido, usá-lo, senão, default para Diversos
+            return CATEGORIES_PT.includes(mappedFromCsv) ? mappedFromCsv : "Diversos";
+        }
+
+
+        /**
+         * Lógica de Submissão ao Google Forms
+         */
+
+        /**
+         * Extrai os IDs de entrada (entry.XXXX) do URL de Pré-preenchimento do Google Forms.
+         * Garante que o URL base seja /formResponse.
+         * @param {string} url - O URL de Pré-preenchimento.
+         * @returns {object} Um mapeamento de nomes de campo (date, merchant, amount, category) para os IDs do Forms.
+         */
+        function extractFormIds(url) {
+            // 1. Corrigir o URL base para /formResponse
+            let correctedUrl = url.replace('/viewform', '/formResponse');
+
+            if (!correctedUrl.includes('/formResponse')) {
+                throw new Error("O URL não parece ser um URL de submissão do Google Forms ('formResponse').");
+            }
+            
+            const params = new URLSearchParams(correctedUrl.split('?')[1]);
+            const entryKeys = [];
+            
+            // Coleciona todos os IDs de entrada presentes
+            for (const [key, value] of params.entries()) {
+                if (key.startsWith('entry.')) {
+                    entryKeys.push(key.split('.')[1]);
+                }
+            }
+
+            if (entryKeys.length < 4) {
+                 showStatus(`Aviso: O URL do Forms deve conter pelo menos 4 IDs de entrada (entry.XXXXX). Apenas ${entryKeys.length} foram encontrados.`, 'error');
+                 throw new Error("Não foram encontrados IDs suficientes no URL. Por favor, gere o link de pré-preenchimento com 4 campos preenchidos (Data, Descrição, Valor, Categoria).");
+            }
+            
+            // Mapeamento: Usando os IDs da URL fornecida pelo usuário:
+            // entry.670590371=Des (Merchant)
+            // entry.322048028=des (Amount)
+            // entry.1886754321=Passes+mensais (Category)
+            // entry.1696802376=2025-10-30 (Date)
+            const ids = {
+                merchant: '670590371', 
+                amount: '322048028',
+                category: '1886754321',
+                date: '1696802376',
+                
+                // Retorna o URL base corrigido
+                baseUrl: correctedUrl.split('?')[0]
+            };
+            
+            return ids;
+        }
+
+        /**
+         * Constrói o URL de submissão do Forms e envia a transação.
+         * @param {object} txnData - Dados da transação (date, merchant, amount, category).
+         * @param {string} categoryOverride - A categoria final escolhida.
+         */
+        async function submitTransactionToForms(txnData, source, categoryOverride) {
+            const formUrl = googleFormUrlInput.value;
+
+            if (!formUrl) {
+                showStatus("Erro: Por favor, insira o URL de Pré-preenchimento do Google Form no campo de configuração (1).", 'error');
+                return;
+            }
+            
+            // 1. Extrair os IDs do URL de base
+            let formIds;
+            try {
+                formIds = extractFormIds(formUrl);
+            } catch (e) {
+                 showStatus(`Erro de URL: ${e.message}`, 'error');
+                 return;
+            }
+
+            // 2. Criar os dados do Formulário para o fetch
+            const formData = new URLSearchParams();
+            
+            // Usar IDs extraídos e mapeados:
+            formData.append(`entry.${formIds.date}`, txnData.date);
+            formData.append(`entry.${formIds.merchant}`, `${txnData.merchant} [${source}]`); 
+            formData.append(`entry.${formIds.amount}`, txnData.amount.toFixed(2));
+            formData.append(`entry.${formIds.category}`, categoryOverride);
+
+            // 3. Enviar a transação
+            try {
+                showStatus(`A submeter transação (${txnData.merchant}) na categoria '${categoryOverride}'...`, 'info');
+                
+                const response = await fetch(formIds.baseUrl, {
+                    method: 'POST',
+                    mode: 'no-cors', 
+                    body: formData,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                });
+
+                showStatus(`Sucesso! Transação '${txnData.merchant}' submetida ao Google Forms com categoria: ${categoryOverride}.`, 'success');
+
+            } catch (error) {
+                console.error("Erro ao submeter ao Google Forms:", error);
+                showStatus(`Erro ao submeter: ${error.message}. Verifique o URL do Forms e a consola.`, 'error');
+            }
+        }
+
+
+        /**
+         * Lógica de Sincronização e Processamento de Dados
+         */
+        function synchronizeAndRender() {
+            allTransactions = [...csvTransactions]; 
+            allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            populateCategoryFiltersAndForm(); 
+            applyFilters();
+        }
+
+        function loadAndParseCSV(source) {
+            if (typeof Papa === 'undefined') {
+                showStatus("Erro: A biblioteca PapaParse não foi carregada corretamente.", 'error');
+                return;
+            }
+
+            let papaSource;
+            if (source instanceof File) {
+                papaSource = source;
+            } else if (source) {
+                try {
+                    papaSource = arrayBufferToString(source);
+                } catch (e) {
+                    showStatus(`Erro ao ler dados automáticos: ${e.message}`, 'error');
+                    return;
+                }
+            } else {
+                csvTransactions = [];
+                synchronizeAndRender();
+                return;
+            }
+
+            showStatus("A processar o ficheiro CSV...", 'info');
+            
+            Papa.parse(papaSource, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    if (results.data.length === 0) {
+                         showStatus("Aviso: O ficheiro CSV foi carregado, mas não contém dados de transação válidos.", 'info');
+                         csvTransactions = [];
+                    } else {
+                        csvTransactions = results.data.map(row => {
+                            let amountStr = row['Txn Amount (Funding Card)'] || '0';
+                            let amount = parseFloat(amountStr.replace(',', '.')) || 0;
+                            const csvCategory = row.Category || row.Type || 'Diversos';
+                            
+                            // Aplicar a lógica de categorização inteligente
+                            const smartCategory = getSmartCategory(row.Merchant, csvCategory, amount);
+
+                            const uniqueId = utf8_to_b64(`${row['Date (YYYY-MM-DD as UTC)']}-${row.Merchant}-${amount}`);
+
+                            return {
+                                id: uniqueId, 
+                                source: 'CSV',
+                                date: row['Date (YYYY-MM-DD as UTC)'],
+                                merchant: row.Merchant,
+                                amount: Math.abs(amount), 
+                                category: smartCategory, // Usar a categoria inteligente
+                                originalCsvCategory: csvCategory // Manter a original para referência
+                            };
+                        }).filter(t => t.merchant && t.amount >= 0); // Manter as entradas também
+                        showStatus(`Sucesso! ${csvTransactions.length} transações CSV carregadas e auto-categorizadas.`, 'success');
+                    }
+                    synchronizeAndRender();
+                },
+                error: (error) => {
+                    console.error("Erro ao parsear CSV:", error);
+                    showStatus(`Erro ao parsear o CSV: ${error.message}`, 'error');
+                }
+            });
+        }
+
+        /**
+         * Lógica de Formulário e Interação
+         */
+
+        // NOVO: Função para alternar o estado de exclusão do Curve Cash
+        function toggleCurveCashFilter() {
+            excludeCurveCash = !excludeCurveCash;
+            
+            if (excludeCurveCash) {
+                toggleCurveCashButton.textContent = "Incluir Transações Curve Cash";
+                toggleCurveCashButton.classList.remove('bg-gray-500', 'hover:bg-gray-600');
+                toggleCurveCashButton.classList.add('bg-orange-500', 'hover:bg-orange-600');
+                toggleCurveCashButton.setAttribute('data-state', 'exclude');
+            } else {
+                toggleCurveCashButton.textContent = "Excluir Transações Curve Cash";
+                toggleCurveCashButton.classList.remove('bg-orange-500', 'hover:bg-orange-600');
+                toggleCurveCashButton.classList.add('bg-gray-500', 'hover:bg-gray-600');
+                toggleCurveCashButton.setAttribute('data-state', 'include');
+            }
+            applyFilters();
+        }
+        
+        /**
+         * Lida com a submissão do formulário manual.
+         */
+        async function handleManualFormSubmission(event) {
+            event.preventDefault();
+            
+            const form = event.target;
+            const txnData = {
+                date: form.txnDate.value,
+                merchant: form.txnMerchant.value,
+                amount: parseFloat(form.txnAmount.value),
+                category: form.txnCategory.value,
+            };
+
+            if (txnData.amount <= 0) {
+                 showStatus("O valor da transação deve ser positivo.", 'error');
+                 return;
+            }
+            
+            // A submissão manual usa o valor diretamente do select
+            await submitTransactionToForms(txnData, 'Manual', txnData.category);
+            form.reset(); 
+            form.txnDate.value = new Date().toISOString().substring(0, 10); 
+        }
+
+        function populateCategoryFiltersAndForm() {
+            const filterSelect = document.getElementById('categoryFilter');
+            const formSelect = document.getElementById('txnCategory');
+
+            filterSelect.innerHTML = '<option value="">Todas as Categorias</option>';
+            formSelect.innerHTML = '<option value="" disabled selected>Selecionar Categoria</option>';
+            
+            CATEGORIES_PT.forEach(cat => {
+                const optionFilter = document.createElement('option');
+                optionFilter.value = cat;
+                optionFilter.textContent = cat;
+                filterSelect.appendChild(optionFilter);
+
+                const optionForm = document.createElement('option');
+                optionForm.value = cat;
+                optionForm.textContent = cat;
+                formSelect.appendChild(optionForm);
+            });
+        }
+
+        function applyFilters() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const selectedCategory = document.getElementById('categoryFilter').value;
+
+            filteredTransactions = allTransactions.filter(txn => {
+                const txnDate = new Date(txn.date);
+                let isDateInRange = true;
+                let isCategoryMatch = true;
+                let isNotCurveCash = true; // Novo filtro
+
+                // 1. Filtro Curve Cash
+                if (excludeCurveCash) {
+                    isNotCurveCash = !txn.merchant.toLowerCase().startsWith('curve cash:');
+                }
+
+                // 2. Filtro de Data
+                if (startDate) {
+                    isDateInRange = isDateInRange && (txnDate >= new Date(startDate));
+                }
+                if (endDate) {
+                    const endDay = new Date(endDate);
+                    endDay.setDate(endDay.getDate() + 1);
+                    isDateInRange = isDateInRange && (txnDate < endDay);
+                }
+
+                // 3. Filtro de Categoria
+                if (selectedCategory) {
+                    isCategoryMatch = txn.category === selectedCategory;
+                }
+                
+                return isDateInRange && isCategoryMatch && isNotCurveCash;
+            });
+
+            renderSummary();
+            renderTransactions();
+        }
+
+        function renderSummary() {
+            const summaryDashboard = document.getElementById('summaryDashboard');
+            summaryDashboard.innerHTML = '';
+            
+            let totalSpent = 0;
+            let totalIncome = 0;
+            const categoryTotals = {};
+
+            filteredTransactions.forEach(txn => {
+                // A quantia já é positiva, usamos a categoria para determinar se é débito ou crédito
+                if (txn.category === "Crédito/Entrada") {
+                    totalIncome += txn.amount;
+                } else {
+                    totalSpent += txn.amount;
+                    categoryTotals[txn.category] = (categoryTotals[txn.category] || 0) + txn.amount;
+                }
+            });
+
+            const netTotal = totalIncome - totalSpent;
+
+            const formatCurrency = (amount) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'EUR' }).format(amount);
+
+            const summaryCards = [
+                { title: 'Despesa Total', value: formatCurrency(totalSpent), color: 'red', icon: 'M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z' },
+                { title: 'Entrada Total', value: formatCurrency(totalIncome), color: 'green', icon: 'M12 8c1.667 0 2 0 3 1.5l-3 3-3-3c1-1.5 1.333-1.5 3-1.5zM12 21a9 9 0 110-18 9 9 0 010 18z' },
+                { title: 'Saldo Líquido', value: formatCurrency(netTotal), color: netTotal >= 0 ? 'secondary' : 'accent', icon: netTotal >= 0 ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' : 'M10 14l2 2 4-4M10 10l-2 2 4 4m-3 2a9 9 0 11-18 0 9 9 0 0118 0z' },
+                { title: 'Transações', value: filteredTransactions.length, color: 'primary', icon: 'M3 10a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8zM17 12a1 1 0 100-2 1 1 0 000 2z' },
+            ];
+
+            summaryCards.forEach(card => {
+                const colorMap = { 'red': 'red', 'green': 'green', 'secondary': 'green', 'accent': 'amber', 'primary': 'indigo' };
+                const baseColor = colorMap[card.color] || 'gray';
+                
+                const cardHtml = `
+                    <div class="bg-white p-5 rounded-xl card flex items-center justify-between border-l-4 border-${baseColor}-500">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">${card.title}</p>
+                            <p class="text-2xl font-bold text-gray-900 mt-1">${card.value}</p>
+                        </div>
+                        <div class="p-3 rounded-full bg-${baseColor}-100 text-${baseColor}-600">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="${card.icon}" />
+                            </svg>
+                        </div>
+                    </div>
+                `;
+                summaryDashboard.insertAdjacentHTML('beforeend', cardHtml);
+            });
+            
+            if (!document.getElementById('categoryFilter').value && totalSpent > 0) {
+                const topCategories = Object.entries(categoryTotals)
+                    .sort(([, a], [, b]) => b - a)
+                    .slice(0, 3);
+                
+                if (topCategories.length > 0) {
+                     const topCategoriesHtml = `
+                        <div class="lg:col-span-4 bg-white p-5 rounded-xl card border-l-4 border-primary mt-4">
+                            <p class="text-sm font-medium text-gray-700 mb-2">Top 3 Despesas por Categoria</p>
+                            <ul class="space-y-1">
+                                ${topCategories.map(([cat, val], index) => `
+                                    <li class="flex justify-between items-center text-sm">
+                                        <span class="font-semibold text-gray-800">${index + 1}. ${cat}</span>
+                                        <span class="text-red-600 font-bold">${formatCurrency(val)}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `;
+                    summaryDashboard.insertAdjacentHTML('beforeend', topCategoriesHtml);
+                }
+            }
+        }
+
+        /**
+         * Renderiza a lista de transações detalhadas, incluindo o SELECT e o botão de submissão.
+         */
+        function renderTransactions() {
+            const body = document.getElementById('transactionsBody');
+            const noDataMessage = document.getElementById('noDataMessage');
+            body.innerHTML = '';
+
+            if (filteredTransactions.length === 0) {
+                noDataMessage.classList.remove('hidden');
+                return;
+            } else {
+                noDataMessage.classList.add('hidden');
+            }
+
+            filteredTransactions.forEach(txn => {
+                const isExpense = txn.category !== "Crédito/Entrada";
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition duration-150';
+
+                const amountClass = isExpense ? 'text-red-600' : 'text-green-600';
+                const sign = isExpense ? '-' : '+';
+                
+                const isCsv = txn.source === 'CSV';
+                const sourceClass = isCsv ? 'text-gray-400' : 'text-secondary font-bold';
+                
+                // Dropdown para edição de categoria
+                const categorySelectId = `category-select-${txn.id}`;
+                const categoryOptions = CATEGORIES_PT.map(cat => 
+                    `<option value="${cat}" ${txn.category === cat ? 'selected' : ''}>${cat}</option>`
+                ).join('');
+
+                const submissionBlock = `
+                    <div class="submission-block">
+                        <select id="${categorySelectId}" class="p-1 border border-gray-300 rounded text-xs bg-white focus:ring-accent focus:border-accent">
+                            ${categoryOptions}
+                        </select>
+                        <button 
+                            data-txn-id="${txn.id}"
+                            class="submit-csv-btn bg-accent hover:bg-orange-600 text-white font-semibold py-1 px-2 rounded text-xs transition duration-200 shadow-sm"
+                            title="Submeter esta transação ao Google Forms"
+                        >
+                            Submeter ao Forms
+                        </button>
+                    </div>
+                `;
+
+                row.innerHTML = `
+                    <td class="px-6 py-3 whitespace-nowrap text-xs ${sourceClass}">${txn.source}</td>
+                    <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500">${txn.date}</td>
+                    <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${txn.merchant}</td>
+                    <td class="px-6 py-3 whitespace-nowrap text-sm text-right font-bold ${amountClass}">
+                        ${sign}${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'EUR' }).format(txn.amount)}
+                    </td>
+                    <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-700">
+                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${isExpense ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                            ${txn.category}
+                        </span>
+                    </td>
+                    <td class="px-6 py-3 whitespace-nowrap text-center">
+                        ${submissionBlock}
+                    </td>
+                `;
+                body.appendChild(row);
+            });
+            
+            // Adiciona listeners aos novos botões de submissão
+            document.querySelectorAll('.submit-csv-btn').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const txnId = e.currentTarget.dataset.txnId;
+                    const txn = csvTransactions.find(t => t.id === txnId);
+                    
+                    // LER O VALOR ATUAL DA DROPDOWN
+                    const selectedCategoryElement = document.getElementById(`category-select-${txnId}`);
+                    const selectedCategory = selectedCategoryElement ? selectedCategoryElement.value : txn.category;
+
+                    if (txn && selectedCategory) {
+                        await submitTransactionToForms(txn, 'CSV', selectedCategory);
+                    } else {
+                        showStatus("Erro: Transação não encontrada ou categoria não selecionada.", 'error');
+                    }
+                });
+            });
+        }
+        
+        // --- FUNÇÃO DE INICIALIZAÇÃO E DECODIFICAÇÃO ---
+        function initializeApp() {
+            // Descodifica o URL do Google Forms se estiver marcado como codificado
+            const urlInput = document.getElementById('googleFormUrl');
+            if (urlInput.getAttribute('data-encoded') === 'true' && urlInput.value) {
+                try {
+                    const decodedUrl = utf8_from_b64(urlInput.value);
+                    urlInput.value = decodedUrl;
+                    urlInput.removeAttribute('data-encoded');
+                } catch (e) {
+                    showStatus("Erro ao descodificar o URL do Google Forms.", 'error');
+                    console.error("Erro ao descodificar Base64:", e);
+                }
+            }
+            
+            populateCategoryFiltersAndForm();
+            document.getElementById('txnDate').value = new Date().toISOString().substring(0, 10);
+
+            if (window.initialCsvDataFallback) {
+                loadAndParseCSV(window.initialCsvDataFallback);
+            } else {
+                csvTransactions = []; 
+                synchronizeAndRender();
+                showStatus("Por favor, insira o URL do Forms e carregue o seu ficheiro CSV.", 'info');
+            }
+            
+            // 4. Adiciona listeners
+            csvFileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    loadAndParseCSV(file);
+                }
+            });
+            document.getElementById('applyFilters').addEventListener('click', applyFilters);
+            document.getElementById('toggleCurveCash').addEventListener('click', toggleCurveCashFilter); // NOVO LISTENER
+            newTransactionForm.addEventListener('submit', handleManualFormSubmission);
+        }
+
+        // --- Inicialização da Aplicação ---
+        window.loadFirestoreTransactions = function() {
+            // Apenas para mostrar o ID do usuário, não carrega dados
+            if (window.isAuthReady) {
+                 userIdDisplay.textContent = `ID do Utilizador: ${window.userId}`;
+            }
+        };
+
+        window.onload = initializeApp;
+    </script>
+</body>
+</html>

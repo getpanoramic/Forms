@@ -3,547 +3,889 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciador de Despesas Automatizado (Google Forms)</title>
+    <title>Gerenciador de Despesas</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#4f46e5',
+                        'secondary': '#10b981',
+                        'accent': '#f97316',
+                    },
+                },
+            }
+        }
+    </script>
     <style>
-        /* Configuração de estilo */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f0f4f8;
+            background-color: #f3f4f6;
         }
-        .container {
-            max-width: 900px;
-            margin: 20px auto;
-            padding: 20px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        .card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
         }
-        .section-header {
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 8px;
-            margin-bottom: 16px;
+        .scrollable-table {
+            max-height: 500px; /* Altura máxima para a lista de transações */
+            overflow-y: auto;
         }
-        .data-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        .transaction-card {
-            background-color: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 12px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-        .transaction-card:hover {
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transform: translateY(-1px);
-        }
-        /* ESTILO PARA TRANSAÇÃO JÁ SUBMETIDA (VERDE) */
-        .transaction-card.submitted {
-            background-color: #d1fae5; /* Verde claro de fundo */
-            border: 1px solid #10b981; /* Borda Verde */
-            opacity: 0.7;
-            pointer-events: none; /* Desativa cliques após submissão */
-            box-shadow: none;
-            cursor: default;
-        }
-        .transaction-card.pending {
-            border-left: 5px solid #f59e0b; /* Amarelo */
-        }
-        .transaction-card.active {
-             border: 2px solid #3b82f6; /* Azul forte quando selecionado */
-             box-shadow: 0 0 0 3px #93c5fd;
-        }
-        .status-message {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            border-radius: 6px;
+        input[type="file"]::file-selector-button {
+            background-color: #4f46e5;
             color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
             font-weight: 600;
-            opacity: 0;
-            transition: opacity 0.5s, transform 0.5s;
-            transform: translateY(-20px);
-            z-index: 1000;
+            margin-right: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
         }
-        .status-message.show {
-            opacity: 1;
-            transform: translateY(0);
+        input[type="file"]::file-selector-button:hover {
+             background-color: #4338ca; 
         }
-        .status-message.success {
-            background-color: #10b981;
-        }
-        .status-message.error {
-            background-color: #ef4444;
-        }
-        /* Estilo para telas menores */
-        @media (max-width: 768px) {
-            .container {
-                margin: 10px;
-                padding: 15px;
-            }
-            .data-grid {
-                grid-template-columns: 1fr;
-            }
+        /* Ajuste para o bloco de submissão na tabela */
+        .submission-block {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: stretch;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.firebaseApp = null;
+        window.db = null;
+        window.auth = null;
+        window.userId = null;
+        window.isAuthReady = false;
+        
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        if (firebaseConfig) {
+            setLogLevel('debug');
+            window.firebaseApp = initializeApp(firebaseConfig);
+            window.db = getFirestore(window.firebaseApp);
+            window.auth = getAuth(window.firebaseApp);
+
+            onAuthStateChanged(window.auth, async (user) => {
+                if (user) {
+                    window.userId = user.uid;
+                } else {
+                    try {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(window.auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(window.auth);
+                        }
+                        window.userId = window.auth.currentUser.uid;
+                    } catch (error) {
+                        console.error("Erro na autenticação do Firebase:", error);
+                        window.userId = `anon-${crypto.randomUUID()}`; 
+                    }
+                }
+                window.isAuthReady = true;
+                if (typeof window.loadFirestoreTransactions === 'function') {
+                    // Mantido, mas sem uso real de Firestore, apenas para a estrutura
+                    window.loadFirestoreTransactions(); 
+                }
+            });
+        }
+        
+        window.initialCsvDataFallback = typeof uploaded_files !== 'undefined' ? (uploaded_files['export.csv'] || uploaded_files[Object.keys(uploaded_files)[0]]) : null;
+
+    </script>
 </head>
-<body>
-    <div class="container">
-        <header class="text-center mb-6">
-            <h1 class="text-3xl font-bold text-gray-800">Gerenciador de Despesas Curve/CSV</h1>
-            <p class="text-gray-500">Carregue um CSV para categorizar e submeter transações ao Google Forms.</p>
+<body class="p-4 sm:p-8">
+
+    <div id="app" class="max-w-7xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-gray-800">📊 Gerenciador Financeiro Pessoal</h1>
+            <p class="text-gray-500 mt-2">Análise de despesas. Submeta transações diretamente para o seu Google Form.</p>
         </header>
 
-        <!-- 1. Carregamento do CSV -->
-        <section class="mb-6 p-4 border rounded-lg bg-gray-50">
-            <h2 class="text-xl font-semibold text-gray-700 section-header">1. Carregar Dados</h2>
-            <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition duration-150">
-        </section>
+        <div id="statusMessage" class="mb-4 p-4 text-center text-sm font-medium rounded-lg hidden"></div>
 
-        <!-- 2. Configuração da Categoria Padrão -->
-        <section class="mb-6 p-4 border rounded-lg bg-gray-50">
-            <h2 class="text-xl font-semibold text-gray-700 section-header">2. Configuração de Categoria</h2>
-            <div class="flex items-center space-x-4">
-                <label for="defaultCategory" class="text-gray-600 font-medium whitespace-nowrap">Categoria Padrão:</label>
-                <input type="text" id="defaultCategory" value="Outras" placeholder="Categoria para transações não correspondidas" class="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-            </div>
-            <div class="mt-4">
-                <label for="categoryMapping" class="text-gray-600 font-medium block mb-1">Mapeamento de Palavras-Chave (JSON):</label>
-                <textarea id="categoryMapping" rows="5" class="w-full p-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder='Ex: {"AMAZON": "Shopping", "LIDL": "Mercearia", "BOLT": "Transporte"}'>
-{
-    "AMAZON": "Shopping",
-    "LIDL": "Mercearia",
-    "BOLT": "Transporte",
-    "REVOLUT": "Transferências",
-    "FARMACIA": "Saúde",
-    "PASTELARIA": "Comer Fora"
-}
-</textarea>
-                <p class="text-xs text-gray-500 mt-1">Insira palavras-chave e as categorias correspondentes. Maiúsculas/Minúsculas não importam.</p>
-            </div>
-        </section>
+        <div class="mb-8 p-6 bg-white rounded-xl card border border-accent-100">
+            <h2 class="text-2xl font-semibold text-accent mb-4">1. Configuração do Google Form</h2>
+            <p class="text-gray-600 mb-4">Cole o **URL de Pré-preenchimento** do seu Google Form abaixo.</p>
+            
+            <input type="url" id="googleFormUrl" 
+                   value="aHR0cHM6Ly9kb2NzLmdvb2dsZS5jb20vZm9ybXMvZC9lLzFGQUlwUUxTZkt1TDZuell0Y2VVWmZVemlkQndoaXpvRkxCQzN2eVlUX09tbmNXZk45OVFUd2hLUS92aWV3Zm9ybT91c3A9cHBybCZlbnRyeS42NzA1OTAzNzE9RGVzJmVudHJ5LjMyMjA0ODAyOD1kZXMmZW50cnkuMTg4Njc1NDMyMT1QYXNzZXMrbWVuc2FpcyZlbnRyeS4xNjk2ODAyMzc2PTIwMjUtMTAtMzA="
+                   required
+                   data-encoded="true"
+                   class="w-full p-2 border border-gray-300 rounded-lg focus:ring-accent focus:border-accent"
+            >
+            <p class="text-xs text-red-500 mt-2 font-semibold">⚠️ O URL deve ter `/viewform?usp=pp_url...`. A submissão será corrigida automaticamente para `/formResponse`.</p>
+        </div>
 
-        <!-- 3. Transações para Submissão -->
-        <section class="mb-6">
-            <h2 class="text-xl font-semibold text-gray-700 section-header">3. Transações Pendentes (<span id="pendingCount">0</span>)</h2>
-            <div class="data-grid" id="transactionsGrid">
-                <p class="text-gray-500 italic col-span-full" id="placeholderMessage">Carregue um arquivo CSV para começar.</p>
+        <div class="mb-8 p-6 bg-white rounded-xl card border border-gray-100">
+            <h2 class="text-2xl font-semibold text-primary mb-4">2. Carregar Dados CSV</h2>
+            <p class="text-gray-600 mb-4">Selecione o seu ficheiro CSV (ex: `export.csv`) para iniciar a análise.</p>
+            
+            <input type="file" id="csvFileInput" accept=".csv" class="w-full text-sm text-gray-500"/>
+        </div>
+
+        <div class="mb-8 p-6 bg-white rounded-xl card border border-gray-100">
+            <h2 class="text-2xl font-semibold text-secondary mb-4">3. Adicionar Nova Transação (Submissão Manual)</h2>
+            <form id="newTransactionForm" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                <div class="flex flex-col">
+                    <label for="txnDate" class="text-sm font-medium text-gray-700 mb-1">Data</label>
+                    <input type="date" id="txnDate" required class="p-2 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                </div>
+                <div class="flex flex-col md:col-span-2">
+                    <label for="txnMerchant" class="text-sm font-medium text-gray-700 mb-1">Descrição / Comerciante</label>
+                    <input type="text" id="txnMerchant" placeholder="Ex: Lidl, Netflix, Uber" required class="p-2 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                </div>
+                <div class="flex flex-col">
+                    <label for="txnAmount" class="text-sm font-medium text-gray-700 mb-1">Valor (€)</label>
+                    <input type="number" step="0.01" id="txnAmount" required class="p-2 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                </div>
+                <div class="flex flex-col">
+                    <label for="txnCategory" class="text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                    <select id="txnCategory" required class="p-2 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                        </select>
+                </div>
+                <button type="submit" id="submitTransaction" class="md:col-span-5 bg-secondary hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                    Submeter Transação ao Forms
+                </button>
+            </form>
+        </div>
+
+
+        <div class="mb-8 p-6 bg-white rounded-xl card border border-gray-100">
+            <h2 class="text-2xl font-semibold text-primary mb-4">4. Resumo e Filtros</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="flex flex-col">
+                    <label for="startDate" class="text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
+                    <input type="date" id="startDate" class="p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                </div>
+                <div class="flex flex-col">
+                    <label for="endDate" class="text-sm font-medium text-gray-700 mb-1">Data Final</label>
+                    <input type="date" id="endDate" class="p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                </div>
+
+                <div class="flex flex-col">
+                    <label for="categoryFilter" class="text-sm font-medium text-gray-700 mb-1">Filtrar por Tipo (Categoria)</label>
+                    <select id="categoryFilter" class="p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                        <option value="">Todas as Categorias</option>
+                        </select>
+                </div>
             </div>
             
-            <button id="submitAllButton" disabled class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow-md transition duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed">
-                Submeter Todas as <span id="submitCount">0</span> Transações Pendentes
-            </button>
-            <p id="submitStatus" class="text-sm text-center mt-2 text-gray-600"></p>
-        </section>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button id="applyFilters" class="w-full bg-primary hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                    Aplicar Filtros
+                </button>
+                <button id="toggleCurveCash" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200" data-state="include">
+                    Excluir Transações Curve Cash
+                </button>
+            </div>
+        </div>
+
+        <div id="summaryDashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            </div>
+
+        <div class="bg-white p-6 rounded-xl card border border-gray-100">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Transações Detalhadas (Com Auto-Categorização)</h2>
+            <div id="transactionsTableContainer" class="scrollable-table">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky top-0 z-10">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fonte</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição (Merchant)</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Valor (€)</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria Sugerida</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsBody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                </table>
+                <div id="noDataMessage" class="hidden text-center py-10 text-gray-500">Nenhuma transação encontrada para os filtros aplicados.</div>
+            </div>
+        </div>
+        
+        <div id="userIdDisplay" class="text-xs text-gray-500 text-center mt-4 p-2 bg-gray-100 rounded">
+            Aguardando autenticação...
+        </div>
+
     </div>
 
-    <!-- Mensagens de Status (Toast) -->
-    <div id="statusToast" class="status-message"></div>
-
     <script type="module">
-        // =========================================================================
-        // CONFIGURAÇÃO DO GOOGLE FORMS E IDs DE ENTRADA
-        // =========================================================================
+        let allTransactions = []; 
+        let csvTransactions = []; 
+        let filteredTransactions = [];
+        let excludeCurveCash = false; 
 
-        // ID DO GOOGLE FORMS
-        const FORMS_ID = '1FAIpQLSfKuL6nzTceUZfUzidBwhizoFLBC3vyYT_OmncWfN99QTwhKQ';
-        const FORMS_URL = `https://docs.google.com/forms/d/e/${FORMS_ID}/formResponse`;
+        // NOVO: Taxa de Câmbio Fixa (apenas para exibição do Curve Cash)
+        // 1 EUR = 0.85 GBP (valor fixo e arbitrário para exibição)
+        const FIXED_RATE_GBP_PER_EUR = 0.85; 
+
+        // CATEGORIAS MESTRE (FORNECIDAS PELO UTILIZADOR)
+        const CATEGORIES_PT = [
+            "Passes mensais", "Jantares", "Subscrições", "Shopping", "Saúde",
+            "Finanças", "Entretenimento", "Groceries", "Diversos", "Viagens",
+            "Crédito/Entrada", "Roupa", "Investimento", "Almoços", "Cafés/Lanches",
+            "Casa", "Hobbies"
+        ];
         
-        // Mapeamento dos campos do formulário para os nomes das colunas (entry.XXX)
-        const FORMS_FIELD_MAP = {
-            'entry.1696802376': 'Date',          // Data (YYYY-MM-DD)
-            'entry.670590371': 'Merchant',       // Comerciante/Descrição
-            'entry.322048028': 'Amount',         // Valor
-            'entry.1886754321': 'Category'       // Categoria
+        // Mapeamento de keywords do Comerciante para a Categoria MESTRE
+        const KEYWORD_MAP = {
+            "Groceries": ['lidl', 'pingo doce', 'continente', 'jumbo', 'auchan', 'mercadona', 'alcampo'],
+            "Subscrições": ['netflix', 'spotify', 'prime', 'apple', 'google *services', 'adobe', 'microsoft', 'patreon'],
+            "Shopping": ['amazon', 'ebay', 'fnac', 'worten', 'decathlon'],
+            "Saúde": ['farmacia', 'hospital', 'clinica', 'medico', 'dentista', 'fisiocare'],
+            "Viagens": ['uber', 'bolt', 'tap', 'ryanair', 'booking', 'airbnb', 'comboios'],
+            "Roupa": ['zara', 'h&m', 'springfield', 'nike', 'adidas', 'c&a', 'massimo dutti'],
+            "Casa": ['ikea', 'leroy merlin', 'bricomarché', 'eletricidade', 'agua', 'gas'],
+            "Investimento": ['degiro', 'trading', 'etf', 'invest'],
+            "Cafés/Lanches": ['cafe', 'pastelaria', 'starbucks', 'torradinha', 'padaria'],
+            "Passes mensais": ['passe', 'mensal', 'transporte', 'carris', 'metro'],
+            "Jantares": ['restaurante', 'sushi', 'pizza', 'hamburguer', 'marisqueira'],
+            "Almoços": ['restaurante', 'take away', 'fast food'], // Sobrescrito por Jantares se mais específico
+            "Entretenimento": ['cinema', 'bilhetes', 'teatro', 'gaming', 'psn', 'xbox'],
+            "Finanças": ['taxa', 'juros', 'comissao', 'banco'],
+            "Hobbies": ['livraria', 'desporto', 'hobby', 'ginásio', 'biblioteca'],
+        };
+        
+        // Mapeamento de categorias originais do CSV para Português (para fallback e correções)
+        const CSV_TYPE_MAPPING = {
+            "Shopping": "Shopping",
+            "Health": "Saúde",
+            "Travel": "Viagens",
+            "Eating Out": "Almoços",
+            "Groceries": "Groceries",
+            "Subscriptions": "Subscrições",
+            "Services": "Diversos", 
+            "Finance": "Finanças",
+            "Entertainment": "Entretenimento",
+            "Clothing": "Roupa",
+            "Investment": "Investimento",
+            "Miscellaneous": "Diversos",
+            "CPT": "Crédito/Entrada",
+            "Refund": "Crédito/Entrada",
+            "Transport": "Passes mensais",
+            "Restaurants": "Jantares"
         };
 
-        // =========================================================================
-        // VARIÁVEIS DE ESTADO E INICIALIZAÇÃO
-        // =========================================================================
 
-        let transactions = [];
-        let categories = {}; // Cache de mapeamento de categorias
-        let isSubmitting = false;
-
-        // Referências aos elementos DOM
-        const csvFileInput = document.getElementById('csvFile');
-        const defaultCategoryInput = document.getElementById('defaultCategory');
-        const categoryMappingTextarea = document.getElementById('categoryMapping');
-        const transactionsGrid = document.getElementById('transactionsGrid');
-        const submitAllButton = document.getElementById('submitAllButton');
-        const pendingCountSpan = document.getElementById('pendingCount');
-        const submitCountSpan = document.getElementById('submitCount');
-        const submitStatusP = document.getElementById('submitStatus');
-        const placeholderMessage = document.getElementById('placeholderMessage');
-        const statusToast = document.getElementById('statusToast');
-
-
-        // Função para exibir mensagens de status (Toast)
-        function showToast(message, type = 'success') {
-            statusToast.textContent = message;
-            statusToast.className = `status-message show ${type}`;
-            setTimeout(() => {
-                statusToast.classList.remove('show');
-            }, 3000);
-        }
-
-        // =========================================================================
-        // LÓGICA DE PROCESSAMENTO DE CSV E CATEGORIZAÇÃO
-        // =========================================================================
-
+        // Elementos de UI
+        const statusMessage = document.getElementById('statusMessage');
+        const csvFileInput = document.getElementById('csvFileInput');
+        const newTransactionForm = document.getElementById('newTransactionForm');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const googleFormUrlInput = document.getElementById('googleFormUrl');
+        const toggleCurveCashButton = document.getElementById('toggleCurveCash');
+        
         /**
-         * Analisa o arquivo CSV para extrair transações (Assumindo formato Curve).
+         * Funções de Utilidade e Status
          */
-        function parseCSV(text) {
-            const lines = text.trim().split('\n');
-            if (lines.length < 2) return [];
+        const arrayBufferToString = (buffer) => new TextDecoder().decode(buffer);
 
-            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-            const dataLines = lines.slice(1);
-            const results = [];
-
-            const indices = {
-                date: headers.indexOf('Date (YYYY-MM-DD as UTC)'),
-                merchant: headers.indexOf('Merchant'),
-                amount: headers.indexOf('Txn Amount (Funding Card)'),
-                currency: headers.indexOf('Txn Currency (Funding Card)'),
-            };
-            
-            if (indices.date === -1 || indices.merchant === -1 || indices.amount === -1 || indices.currency === -1) {
-                showToast("Erro: O CSV não contém colunas essenciais (Data, Merchant, Txn Amount, Txn Currency).", 'error');
-                return [];
-            }
-
-            dataLines.forEach((line, index) => {
-                const values = line.match(/(".*?"|[^",\r\n]+)(?=\s*,|\s*$)/g) || [];
-                const row = values.map(v => v.trim().replace(/"/g, ''));
-
-                // Filtra: Apenas gastos (valor negativo) em EUR, e ignora cashback
-                if (row.length <= indices.amount || 
-                    row[indices.amount].startsWith('-') === false || 
-                    row[indices.currency] !== 'EUR' ||
-                    row[indices.merchant].startsWith('Curve Cash:') 
-                ) {
-                    return; 
+        // NOVO: Descodifica Base64 em string UTF-8
+        function utf8_from_b64(b64) {
+            try {
+                const binaryString = atob(b64);
+                const len = binaryString.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
                 }
-
-                const date = row[indices.date];
-                const merchant = row[indices.merchant];
-                const amount = parseFloat(row[indices.amount].replace('-', '')); 
-
-                if (isNaN(amount) || amount <= 0) return; 
-
-                results.push({
-                    id: `txn-${date}-${index}`,
-                    date: date,
-                    merchant: merchant,
-                    amount: amount,
-                    category: determineCategory(merchant, categories),
-                    isSubmitted: false,
-                    isSelected: true, 
-                });
-            });
-
-            return results;
+                return new TextDecoder().decode(bytes);
+            } catch (e) {
+                console.error("Error during Base64 to UTF-8 decoding:", e);
+                return b64; // Retorna o valor original em caso de erro
+            }
         }
 
-        /**
-         * Determina a categoria com base nas palavras-chave.
-         */
-        function determineCategory(merchant, categoryMap) {
-            const defaultCat = defaultCategoryInput.value || 'Outras';
-            const merchantUpper = merchant.toUpperCase();
-
-            for (const keyword in categoryMap) {
-                if (merchantUpper.includes(keyword.toUpperCase())) {
-                    return categoryMap[keyword];
-                }
-            }
-            return defaultCat;
-        }
-
-        // =========================================================================
-        // LÓGICA DE SUBMISSÃO AO GOOGLE FORMS (COM BACKOFF)
-        // =========================================================================
-
-        /**
-         * Constrói o payload de submissão.
-         */
-        function buildFormsPayload(transaction, useCommaDecimal) {
-            const date = transaction.date; 
-            
-            // Formata o valor, garantindo o separador correto
-            const amountStr = useCommaDecimal 
-                ? transaction.amount.toFixed(2).replace('.', ',') 
-                : transaction.amount.toFixed(2);
-            
-            const payload = {
-                [FORMS_FIELD_MAP['entry.1696802376']]: date,
-                [FORMS_FIELD_MAP['entry.670590371']]: transaction.merchant,
-                [FORMS_FIELD_MAP['entry.322048028']]: amountStr,
-                [FORMS_FIELD_MAP['entry.1886754321']]: transaction.category
-            };
-
-            // Conversão para URLSearchParams para codificação correta
-            const formData = new URLSearchParams();
-            for (const key in payload) {
-                formData.append(key, payload[key]);
-            }
-
-            return { formData, payload };
-        }
-
-        /**
-         * Tenta submeter a transação com exponential backoff.
-         */
-        async function submitTransactionWithRetry(transaction) {
-            const MAX_RETRIES = 3;
-            // Tenta submeter primeiro com ponto decimal e, se falhar, tenta com vírgula.
-            const decimalFormats = [
-                { useComma: false, name: 'Ponto Decimal (.)' },
-                { useComma: true, name: 'Vírgula Decimal (,)' }
-            ];
-
-            for (const format of decimalFormats) {
-                for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-                    const delay = Math.pow(2, attempt) * 100 + Math.random() * 100;
-                    
-                    if (attempt > 1) {
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                    }
-                    
-                    try {
-                        const { formData, payload } = buildFormsPayload(transaction, format.useComma);
-
-                        console.groupCollapsed(`[Forms Submissão: ${transaction.id}] Tentativa ${attempt}/${MAX_RETRIES} - Formato: ${format.name}`);
-                        console.log('URL de Submissão:', FORMS_URL);
-                        console.log('Payload Enviado (entry.XXX):', payload);
-                        console.groupEnd();
-                        
-                        const response = await fetch(FORMS_URL, {
-                            method: 'POST',
-                            mode: 'no-cors', 
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded'
-                            },
-                            body: formData.toString()
-                        });
-
-                        // No modo 'no-cors', consideramos sucesso se não houver erro de rede
-                        return true; 
-
-                    } catch (error) {
-                        console.error(`[Forms Submissão: ${transaction.id}] Erro na Tentativa ${attempt}: ${error.message}`);
-                        if (attempt === MAX_RETRIES) {
-                            console.error(`[Forms Submissão: ${transaction.id}] Falha após ${MAX_RETRIES} retentativas.`);
-                            return false; 
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-
-        /**
-         * Submete todas as transações selecionadas em série.
-         */
-        async function submitAllSelectedTransactions() {
-            if (isSubmitting) return;
-
-            const pendingTransactions = transactions.filter(t => t.isSelected && !t.isSubmitted);
-            if (pendingTransactions.length === 0) {
-                showToast("Nenhuma transação pendente selecionada.", 'warn');
-                return;
-            }
-
-            isSubmitting = true;
-            submitAllButton.disabled = true;
-            submitAllButton.textContent = `Submetendo 0 de ${pendingTransactions.length}...`;
-            
-            let submittedCount = 0;
-            let totalToSubmit = pendingTransactions.length;
-
-            for (let i = 0; i < totalToSubmit; i++) {
-                const transaction = pendingTransactions[i];
-                submitStatusP.textContent = `Processando: ${i + 1} de ${totalToSubmit} (${transaction.merchant}, ${transaction.amount.toFixed(2)} €)...`;
+        // Mantida: Codifica string UTF-8 em Base64
+        function utf8_to_b64(str) {
+            try {
+                const encoder = new TextEncoder();
+                const utf8Bytes = encoder.encode(str);
                 
-                // Encontra o elemento do cartão para atualização visual
-                const cardElement = document.getElementById(transaction.id);
-
-                if (await submitTransactionWithRetry(transaction)) {
-                    // SUCESSO
-                    transaction.isSubmitted = true;
-                    submittedCount++;
-                    
-                    if (cardElement) {
-                         // Remove classes de ativo/pendente e adiciona a classe de submetido
-                         cardElement.classList.remove('pending', 'active');
-                         cardElement.classList.add('submitted');
-                         // Remove o handler de clique para evitar re-seleção
-                         cardElement.onclick = null; 
-                    }
-                    submitAllButton.textContent = `Submetendo ${submittedCount} de ${totalToSubmit}...`;
-                } else {
-                    // FALHA
-                    transaction.isSelected = false;
-                    if (cardElement) {
-                        // Marca visualmente a falha
-                        cardElement.classList.remove('pending', 'active');
-                        cardElement.classList.add('border-red-500', 'bg-red-100');
-                        cardElement.querySelector('.text-sm').textContent += ' (FALHA na Submissão)';
-                    }
-                    showToast(`Falha na submissão: ${transaction.merchant}. Verifique o log.`, 'error');
+                let binaryString = "";
+                for (let i = 0; i < utf8Bytes.length; i++) {
+                    binaryString += String.fromCharCode(utf8Bytes[i]);
                 }
                 
-                await new Promise(resolve => setTimeout(resolve, 50));
+                return btoa(binaryString);
+            } catch (e) {
+                console.error("Error during UTF-8 to Base64 conversion:", e);
+                return `ENCODING_ERROR_${Math.random().toString(36).substring(2, 9)}`;
             }
-
-            // Finalização
-            isSubmitting = false;
-            updateUI(); // Chama o UI update final para atualizar contagens e estado do botão
-            
-            showToast(`Processo concluído. ${submittedCount} transações submetidas.`, 'success');
-            submitStatusP.textContent = `Submissão concluída. ${submittedCount} transações adicionadas.`;
         }
 
-        // =========================================================================
-        // FUNÇÕES DA INTERFACE DO UTILIZADOR
-        // =========================================================================
-
-        /**
-         * Renderiza as transações na grelha.
-         */
-        function renderTransactions() {
-            transactionsGrid.innerHTML = '';
-
-            if (transactions.length === 0) {
-                placeholderMessage.classList.remove('hidden');
-                return;
+        function showStatus(message, type = 'info') {
+            statusMessage.textContent = message;
+            statusMessage.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700', 'bg-yellow-100', 'text-yellow-700');
+            statusMessage.classList.add('block');
+            
+            if (type === 'error') {
+                statusMessage.classList.add('bg-red-100', 'text-red-700');
+            } else if (type === 'success') {
+                statusMessage.classList.add('bg-green-100', 'text-green-700');
             } else {
-                placeholderMessage.classList.add('hidden');
+                statusMessage.classList.add('bg-yellow-100', 'text-yellow-700');
             }
-
-            transactions.forEach(t => {
-                const card = document.createElement('div');
-                card.id = t.id;
-                
-                // Define a classe inicial com base no estado
-                let cardClasses = 'transaction-card';
-                if (t.isSubmitted) {
-                    cardClasses += ' submitted';
-                } else {
-                    cardClasses += ' pending';
-                    if (t.isSelected) {
-                        cardClasses += ' active';
-                    }
-                }
-                card.className = cardClasses;
-                
-                card.innerHTML = `
-                    <p class="font-bold text-lg text-gray-800">${t.amount.toFixed(2)} €</p>
-                    <p class="text-xs text-gray-500">${t.date}</p>
-                    <p class="text-sm text-gray-600 truncate mt-1">${t.merchant}</p>
-                    <p class="text-xs font-semibold mt-1 p-1 inline-block rounded-full bg-blue-100 text-blue-700">${t.category}</p>
-                `;
-                
-                // Adiciona o evento de clique para seleção manual (apenas para transações não submetidas)
-                if (!t.isSubmitted) {
-                    card.onclick = () => {
-                        t.isSelected = !t.isSelected;
-                        card.classList.toggle('active', t.isSelected);
-                        updateSubmitButton();
-                    };
-                }
-
-                transactionsGrid.appendChild(card);
-            });
-        }
-
-        /**
-         * Atualiza o botão de submissão e as contagens.
-         */
-        function updateSubmitButton() {
-            const pending = transactions.filter(t => t.isSelected && !t.isSubmitted);
-            const totalPending = transactions.filter(t => !t.isSubmitted).length;
-
-            pendingCountSpan.textContent = totalPending;
-            submitCountSpan.textContent = pending.length;
-            submitAllButton.disabled = pending.length === 0 || isSubmitting;
-            submitAllButton.textContent = `Submeter Todas as ${pending.length} Transações Pendentes`;
         }
         
         /**
-         * Atualiza toda a interface após uma mudança de estado.
+         * Lógica de Categorização Inteligente
+         * @param {string} merchant - Nome do comerciante.
+         * @param {string} originalCategory - Categoria do CSV original.
+         * @param {number} amount - Valor da transação.
+         * @returns {string} Categoria mapeada em Português.
          */
-        function updateUI() {
-            renderTransactions();
-            updateSubmitButton();
+        function getSmartCategory(merchant, originalCategory, amount) {
+            const normalizedMerchant = merchant.toLowerCase();
+
+            // 1. Prioridade máxima: Crédito/Entrada (com base no valor ou Curve Cash)
+            if (amount >= 0 || normalizedMerchant.startsWith('curve cash:')) {
+                return "Crédito/Entrada";
+            }
+            
+            // 2. Mapeamento por Keywords do Comerciante (mais específico)
+            for (const category in KEYWORD_MAP) {
+                for (const keyword of KEYWORD_MAP[category]) {
+                    if (normalizedMerchant.includes(keyword.toLowerCase())) {
+                        // Tratar Jantares e Almoços: Jantares deve ser mais específico
+                        if (category === "Almoços" && normalizedMerchant.includes('restaurante')) {
+                            // Se for restaurante, prefere "Jantares", mas Almoços é o fallback para Eating Out em geral
+                            return "Jantares";
+                        }
+                        return category;
+                    }
+                }
+            }
+
+            // 3. Mapeamento por Categoria do CSV (Fallback)
+            const mappedFromCsv = CSV_TYPE_MAPPING[originalCategory] || "Diversos";
+            
+            // 4. Se o mapeamento do CSV é válido, usá-lo, senão, default para Diversos
+            return CATEGORIES_PT.includes(mappedFromCsv) ? mappedFromCsv : "Diversos";
         }
 
-        // =========================================================================
-        // LISTENERS E INICIALIZAÇÃO
-        // =========================================================================
 
-        // Listener de arquivo CSV
-        csvFileInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
+        /**
+         * Lógica de Submissão ao Google Forms
+         */
 
-            const reader = new FileReader();
-            reader.onload = (e) => {
+        /**
+         * Extrai os IDs de entrada (entry.XXXX) do URL de Pré-preenchimento do Google Forms.
+         * Garante que o URL base seja /formResponse.
+         * @param {string} url - O URL de Pré-preenchimento.
+         * @returns {object} Um mapeamento de nomes de campo (date, merchant, amount, category) para os IDs do Forms.
+         */
+        function extractFormIds(url) {
+            // 1. Corrigir o URL base para /formResponse
+            let correctedUrl = url.replace('/viewform', '/formResponse');
+
+            if (!correctedUrl.includes('/formResponse')) {
+                throw new Error("O URL não parece ser um URL de submissão do Google Forms ('formResponse').");
+            }
+            
+            const params = new URLSearchParams(correctedUrl.split('?')[1]);
+            const entryKeys = [];
+            
+            // Coleciona todos os IDs de entrada presentes
+            for (const [key, value] of params.entries()) {
+                if (key.startsWith('entry.')) {
+                    entryKeys.push(key.split('.')[1]);
+                }
+            }
+
+            if (entryKeys.length < 4) {
+                 showStatus(`Aviso: O URL do Forms deve conter pelo menos 4 IDs de entrada (entry.XXXXX). Apenas ${entryKeys.length} foram encontrados.`, 'error');
+                 throw new Error("Não foram encontrados IDs suficientes no URL. Por favor, gere o link de pré-preenchimento com 4 campos preenchidos (Data, Descrição, Valor, Categoria).");
+            }
+            
+            // Mapeamento: Usando os IDs da URL fornecida pelo usuário:
+            // entry.670590371=Des (Merchant)
+            // entry.322048028=des (Amount)
+            // entry.1886754321=Passes+mensais (Category)
+            // entry.1696802376=2025-10-30 (Date)
+            const ids = {
+                merchant: '670590371', 
+                amount: '322048028',
+                category: '1886754321',
+                date: '1696802376',
+                
+                // Retorna o URL base corrigido
+                baseUrl: correctedUrl.split('?')[0]
+            };
+            
+            return ids;
+        }
+
+        /**
+         * Constrói o URL de submissão do Forms e envia a transação.
+         * @param {object} txnData - Dados da transação (date, merchant, amount, category).
+         * @param {string} categoryOverride - A categoria final escolhida.
+         */
+        async function submitTransactionToForms(txnData, source, categoryOverride) {
+            const formUrl = googleFormUrlInput.value;
+
+            if (!formUrl) {
+                showStatus("Erro: Por favor, insira o URL de Pré-preenchimento do Google Form no campo de configuração (1).", 'error');
+                return;
+            }
+            
+            // 1. Extrair os IDs do URL de base
+            let formIds;
+            try {
+                formIds = extractFormIds(formUrl);
+            } catch (e) {
+                 showStatus(`Erro de URL: ${e.message}`, 'error');
+                 return;
+            }
+
+            // 2. Criar os dados do Formulário para o fetch
+            const formData = new URLSearchParams();
+            
+            // Usar IDs extraídos e mapeados:
+            formData.append(`entry.${formIds.date}`, txnData.date);
+            formData.append(`entry.${formIds.merchant}`, `${txnData.merchant} [${source}]`); 
+            formData.append(`entry.${formIds.amount}`, txnData.amount.toFixed(2));
+            formData.append(`entry.${formIds.category}`, categoryOverride);
+
+            // 3. Enviar a transação
+            try {
+                showStatus(`A submeter transação (${txnData.merchant}) na categoria '${categoryOverride}'...`, 'info');
+                
+                const response = await fetch(formIds.baseUrl, {
+                    method: 'POST',
+                    mode: 'no-cors', 
+                    body: formData,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                });
+
+                showStatus(`Sucesso! Transação '${txnData.merchant}' submetida ao Google Forms com categoria: ${categoryOverride}.`, 'success');
+
+            } catch (error) {
+                console.error("Erro ao submeter ao Google Forms:", error);
+                showStatus(`Erro ao submeter: ${error.message}. Verifique o URL do Forms e a consola.`, 'error');
+            }
+        }
+
+
+        /**
+         * Lógica de Sincronização e Processamento de Dados
+         */
+        function synchronizeAndRender() {
+            allTransactions = [...csvTransactions]; 
+            allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            populateCategoryFiltersAndForm(); 
+            applyFilters();
+        }
+
+        function loadAndParseCSV(source) {
+            if (typeof Papa === 'undefined') {
+                showStatus("Erro: A biblioteca PapaParse não foi carregada corretamente.", 'error');
+                return;
+            }
+
+            let papaSource;
+            if (source instanceof File) {
+                papaSource = source;
+            } else if (source) {
                 try {
-                    categories = JSON.parse(categoryMappingTextarea.value);
-                } catch (err) {
-                    showToast("Erro ao analisar o Mapeamento de Categorias. Verifique se o JSON está correto.", 'error');
-                    console.error("Erro JSON:", err);
+                    papaSource = arrayBufferToString(source);
+                } catch (e) {
+                    showStatus(`Erro ao ler dados automáticos: ${e.message}`, 'error');
                     return;
                 }
+            } else {
+                csvTransactions = [];
+                synchronizeAndRender();
+                return;
+            }
 
-                transactions = parseCSV(e.target.result);
-                
-                if (transactions.length > 0) {
-                    showToast(`CSV carregado. Encontradas ${transactions.length} transações elegíveis.`, 'success');
-                } else {
-                    showToast("CSV carregado, mas nenhuma transação elegível encontrada.", 'warn');
+            showStatus("A processar o ficheiro CSV...", 'info');
+            
+            Papa.parse(papaSource, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    if (results.data.length === 0) {
+                         showStatus("Aviso: O ficheiro CSV foi carregado, mas não contém dados de transação válidos.", 'info');
+                         csvTransactions = [];
+                    } else {
+                        csvTransactions = results.data.map(row => {
+                            let amountStr = row['Txn Amount (Funding Card)'] || '0';
+                            let amount = parseFloat(amountStr.replace(',', '.')) || 0;
+                            const csvCategory = row.Category || row.Type || 'Diversos';
+                            
+                            // Aplicar a lógica de categorização inteligente
+                            const smartCategory = getSmartCategory(row.Merchant, csvCategory, amount);
+
+                            const uniqueId = utf8_to_b64(`${row['Date (YYYY-MM-DD as UTC)']}-${row.Merchant}-${amount}`);
+
+                            return {
+                                id: uniqueId, 
+                                source: 'CSV',
+                                date: row['Date (YYYY-MM-DD as UTC)'],
+                                merchant: row.Merchant,
+                                amount: Math.abs(amount), 
+                                category: smartCategory, // Usar a categoria inteligente
+                                originalCsvCategory: csvCategory // Manter a original para referência
+                            };
+                        }).filter(t => t.merchant && t.amount >= 0); // Manter as entradas também
+                        showStatus(`Sucesso! ${csvTransactions.length} transações CSV carregadas e auto-categorizadas.`, 'success');
+                    }
+                    synchronizeAndRender();
+                },
+                error: (error) => {
+                    console.error("Erro ao parsear CSV:", error);
+                    showStatus(`Erro ao parsear o CSV: ${error.message}`, 'error');
+                }
+            });
+        }
+
+        /**
+         * Lógica de Formulário e Interação
+         */
+
+        // NOVO: Função para alternar o estado de exclusão do Curve Cash
+        function toggleCurveCashFilter() {
+            excludeCurveCash = !excludeCurveCash;
+            
+            if (excludeCurveCash) {
+                toggleCurveCashButton.textContent = "Incluir Transações Curve Cash";
+                toggleCurveCashButton.classList.remove('bg-gray-500', 'hover:bg-gray-600');
+                toggleCurveCashButton.classList.add('bg-orange-500', 'hover:bg-orange-600');
+                toggleCurveCashButton.setAttribute('data-state', 'exclude');
+            } else {
+                toggleCurveCashButton.textContent = "Excluir Transações Curve Cash";
+                toggleCurveCashButton.classList.remove('bg-orange-500', 'hover:bg-orange-600');
+                toggleCurveCashButton.classList.add('bg-gray-500', 'hover:bg-gray-600');
+                toggleCurveCashButton.setAttribute('data-state', 'include');
+            }
+            applyFilters();
+        }
+        
+        /**
+         * Lida com a submissão do formulário manual.
+         */
+        async function handleManualFormSubmission(event) {
+            event.preventDefault();
+            
+            const form = event.target;
+            const txnData = {
+                date: form.txnDate.value,
+                merchant: form.txnMerchant.value,
+                amount: parseFloat(form.txnAmount.value),
+                category: form.txnCategory.value,
+            };
+
+            if (txnData.amount <= 0) {
+                 showStatus("O valor da transação deve ser positivo.", 'error');
+                 return;
+            }
+            
+            // A submissão manual usa o valor diretamente do select
+            await submitTransactionToForms(txnData, 'Manual', txnData.category);
+            form.reset(); 
+            form.txnDate.value = new Date().toISOString().substring(0, 10); 
+        }
+
+        function populateCategoryFiltersAndForm() {
+            const filterSelect = document.getElementById('categoryFilter');
+            const formSelect = document.getElementById('txnCategory');
+
+            filterSelect.innerHTML = '<option value="">Todas as Categorias</option>';
+            formSelect.innerHTML = '<option value="" disabled selected>Selecionar Categoria</option>';
+            
+            CATEGORIES_PT.forEach(cat => {
+                const optionFilter = document.createElement('option');
+                optionFilter.value = cat;
+                optionFilter.textContent = cat;
+                filterSelect.appendChild(optionFilter);
+
+                const optionForm = document.createElement('option');
+                optionForm.value = cat;
+                optionForm.textContent = cat;
+                formSelect.appendChild(optionForm);
+            });
+        }
+
+        function applyFilters() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const selectedCategory = document.getElementById('categoryFilter').value;
+
+            filteredTransactions = allTransactions.filter(txn => {
+                const txnDate = new Date(txn.date);
+                let isDateInRange = true;
+                let isCategoryMatch = true;
+                let isNotCurveCash = true; // Novo filtro
+
+                // 1. Filtro Curve Cash
+                if (excludeCurveCash) {
+                    isNotCurveCash = !txn.merchant.toLowerCase().startsWith('curve cash:');
                 }
 
-                updateUI();
-            };
-            reader.readAsText(file);
-        });
-        
-        // Listener do botão de submissão
-        submitAllButton.addEventListener('click', submitAllSelectedTransactions);
+                // 2. Filtro de Data
+                if (startDate) {
+                    isDateInRange = isDateInRange && (txnDate >= new Date(startDate));
+                }
+                if (endDate) {
+                    const endDay = new Date(endDate);
+                    endDay.setDate(endDay.getDate() + 1);
+                    isDateInRange = isDateInRange && (txnDate < endDay);
+                }
 
-        // Listener para mudanças no mapeamento de categorias (para recarregar)
-        categoryMappingTextarea.addEventListener('change', () => {
-             try {
-                categories = JSON.parse(categoryMappingTextarea.value);
-                // Re-categoriza transações não submetidas
-                transactions.filter(t => !t.isSubmitted).forEach(t => {
-                    t.category = determineCategory(t.merchant, categories);
-                });
-                updateUI();
-                showToast("Mapeamento de categorias atualizado e re-aplicado.", 'info');
-            } catch (err) {
-                showToast("Erro: O JSON do mapeamento está inválido.", 'error');
+                // 3. Filtro de Categoria
+                if (selectedCategory) {
+                    isCategoryMatch = txn.category === selectedCategory;
+                }
+                
+                return isDateInRange && isCategoryMatch && isNotCurveCash;
+            });
+
+            renderSummary();
+            renderTransactions();
+        }
+
+        function renderSummary() {
+            const summaryDashboard = document.getElementById('summaryDashboard');
+            summaryDashboard.innerHTML = '';
+            
+            let totalSpent = 0;
+            let totalIncome = 0;
+            const categoryTotals = {};
+
+            filteredTransactions.forEach(txn => {
+                // A quantia já é positiva, usamos a categoria para determinar se é débito ou crédito
+                if (txn.category === "Crédito/Entrada") {
+                    totalIncome += txn.amount;
+                } else {
+                    totalSpent += txn.amount;
+                    categoryTotals[txn.category] = (categoryTotals[txn.category] || 0) + txn.amount;
+                }
+            });
+
+            const netTotal = totalIncome - totalSpent;
+
+            const formatCurrency = (amount) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'EUR' }).format(amount);
+
+            const summaryCards = [
+                { title: 'Despesa Total', value: formatCurrency(totalSpent), color: 'red', icon: 'M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z' },
+                { title: 'Entrada Total', value: formatCurrency(totalIncome), color: 'green', icon: 'M12 8c1.667 0 2 0 3 1.5l-3 3-3-3c1-1.5 1.333-1.5 3-1.5zM12 21a9 9 0 110-18 9 9 0 010 18z' },
+                { title: 'Saldo Líquido', value: formatCurrency(netTotal), color: netTotal >= 0 ? 'secondary' : 'accent', icon: netTotal >= 0 ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' : 'M10 14l2 2 4-4M10 10l-2 2 4 4m-3 2a9 9 0 11-18 0 9 9 0 0118 0z' },
+                { title: 'Transações', value: filteredTransactions.length, color: 'primary', icon: 'M3 10a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8zM17 12a1 1 0 100-2 1 1 0 000 2z' },
+            ];
+
+            summaryCards.forEach(card => {
+                const colorMap = { 'red': 'red', 'green': 'green', 'secondary': 'green', 'accent': 'amber', 'primary': 'indigo' };
+                const baseColor = colorMap[card.color] || 'gray';
+                
+                const cardHtml = `
+                    <div class="bg-white p-5 rounded-xl card flex items-center justify-between border-l-4 border-${baseColor}-500">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">${card.title}</p>
+                            <p class="text-2xl font-bold text-gray-900 mt-1">${card.value}</p>
+                        </div>
+                        <div class="p-3 rounded-full bg-${baseColor}-100 text-${baseColor}-600">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="${card.icon}" />
+                            </svg>
+                        </div>
+                    </div>
+                `;
+                summaryDashboard.insertAdjacentHTML('beforeend', cardHtml);
+            });
+            
+            if (!document.getElementById('categoryFilter').value && totalSpent > 0) {
+                const topCategories = Object.entries(categoryTotals)
+                    .sort(([, a], [, b]) => b - a)
+                    .slice(0, 3);
+                
+                if (topCategories.length > 0) {
+                     const topCategoriesHtml = `
+                        <div class="lg:col-span-4 bg-white p-5 rounded-xl card border-l-4 border-primary mt-4">
+                            <p class="text-sm font-medium text-gray-700 mb-2">Top 3 Despesas por Categoria</p>
+                            <ul class="space-y-1">
+                                ${topCategories.map(([cat, val], index) => `
+                                    <li class="flex justify-between items-center text-sm">
+                                        <span class="font-semibold text-gray-800">${index + 1}. ${cat}</span>
+                                        <span class="text-red-600 font-bold">${formatCurrency(val)}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `;
+                    summaryDashboard.insertAdjacentHTML('beforeend', topCategoriesHtml);
+                }
             }
-        });
+        }
 
-        // Inicialização
-        window.onload = () => {
-            console.log("Gerenciador de Despesas carregado. Forms ID:", FORMS_ID);
-            updateUI();
+        /**
+         * Renderiza a lista de transações detalhadas, incluindo o SELECT e o botão de submissão.
+         */
+        function renderTransactions() {
+            const body = document.getElementById('transactionsBody');
+            const noDataMessage = document.getElementById('noDataMessage');
+            body.innerHTML = '';
+
+            if (filteredTransactions.length === 0) {
+                noDataMessage.classList.remove('hidden');
+                return;
+            } else {
+                noDataMessage.classList.add('hidden');
+            }
+
+            filteredTransactions.forEach(txn => {
+                const isExpense = txn.category !== "Crédito/Entrada";
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition duration-150';
+
+                const amountClass = isExpense ? 'text-red-600' : 'text-green-600';
+                const sign = isExpense ? '-' : '+';
+                
+                const isCsv = txn.source === 'CSV';
+                const sourceClass = isCsv ? 'text-gray-400' : 'text-secondary font-bold';
+                
+                // Dropdown para edição de categoria
+                const categorySelectId = `category-select-${txn.id}`;
+                const categoryOptions = CATEGORIES_PT.map(cat => 
+                    `<option value="${cat}" ${txn.category === cat ? 'selected' : ''}>${cat}</option>`
+                ).join('');
+
+                const submissionBlock = `
+                    <div class="submission-block">
+                        <select id="${categorySelectId}" class="p-1 border border-gray-300 rounded text-xs bg-white focus:ring-accent focus:border-accent">
+                            ${categoryOptions}
+                        </select>
+                        <button 
+                            data-txn-id="${txn.id}"
+                            class="submit-csv-btn bg-accent hover:bg-orange-600 text-white font-semibold py-1 px-2 rounded text-xs transition duration-200 shadow-sm"
+                            title="Submeter esta transação ao Google Forms"
+                        >
+                            Submeter ao Forms
+                        </button>
+                    </div>
+                `;
+
+                // --- NOVO: Lógica de Conversão Fixa para Curve Cash na MESMA LINHA ---
+                let conversionHtml = '';
+                if (txn.merchant.toLowerCase().startsWith('curve cash:')) {
+                    const curveAmountCPT = txn.amount;
+                    const convertedGBP = curveAmountCPT * FIXED_RATE_GBP_PER_EUR;
+
+                    // O usuário quer: ( £{GBP} GBP | €{CPT_AMOUNT} CPT) abaixo do CPT (Crédito/Entrada) badge
+                    conversionHtml = `
+                        <br>
+                        <span class="text-xs text-gray-500 font-medium whitespace-nowrap">
+                            ( <span class="text-blue-700">£${convertedGBP.toFixed(2)} GBP</span> | 
+                            <span class="text-green-700">€${curveAmountCPT.toFixed(2)} CPT</span> )
+                        </span>
+                    `;
+                }
+                // --- FIM NOVO CÓDIGO DE CONVERSÃO NA MESMA LINHA ---
+
+                row.innerHTML = `
+                    <td class="px-6 py-3 whitespace-nowrap text-xs ${sourceClass}">${txn.source}</td>
+                    <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500">${txn.date}</td>
+                    <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${txn.merchant}</td>
+                    <td class="px-6 py-3 whitespace-nowrap text-sm text-right font-bold ${amountClass}">
+                        ${sign}${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'EUR' }).format(txn.amount)}
+                    </td>
+                    <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-700">
+                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${isExpense ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                            ${txn.category}
+                        </span>
+                        ${conversionHtml}
+                    </td>
+                    <td class="px-6 py-3 whitespace-nowrap text-center">
+                        ${submissionBlock}
+                    </td>
+                `;
+                body.appendChild(row);
+
+                // A lógica de uma segunda row foi removida.
+            });
+            
+            // Adiciona listeners aos novos botões de submissão
+            document.querySelectorAll('.submit-csv-btn').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const txnId = e.currentTarget.dataset.txnId;
+                    const txn = csvTransactions.find(t => t.id === txnId);
+                    
+                    // LER O VALOR ATUAL DA DROPDOWN
+                    const selectedCategoryElement = document.getElementById(`category-select-${txnId}`);
+                    const selectedCategory = selectedCategoryElement ? selectedCategoryElement.value : txn.category;
+
+                    if (txn && selectedCategory) {
+                        await submitTransactionToForms(txn, 'CSV', selectedCategory);
+                    } else {
+                        showStatus("Erro: Transação não encontrada ou categoria não selecionada.", 'error');
+                    }
+                });
+            });
+        }
+        
+        // --- FUNÇÃO DE INICIALIZAÇÃO E DECODIFICAÇÃO ---
+        function initializeApp() {
+            // Descodifica o URL do Google Forms se estiver marcado como codificado
+            const urlInput = document.getElementById('googleFormUrl');
+            if (urlInput.getAttribute('data-encoded') === 'true' && urlInput.value) {
+                try {
+                    const decodedUrl = utf8_from_b64(urlInput.value);
+                    urlInput.value = decodedUrl;
+                    urlInput.removeAttribute('data-encoded');
+                } catch (e) {
+                    showStatus("Erro ao descodificar o URL do Google Forms.", 'error');
+                    console.error("Erro ao descodificar Base64:", e);
+                }
+            }
+            
+            populateCategoryFiltersAndForm();
+            document.getElementById('txnDate').value = new Date().toISOString().substring(0, 10);
+
+            if (window.initialCsvDataFallback) {
+                loadAndParseCSV(window.initialCsvDataFallback);
+            } else {
+                csvTransactions = []; 
+                synchronizeAndRender();
+                showStatus("Por favor, insira o URL do Forms e carregue o seu ficheiro CSV.", 'info');
+            }
+            
+            // 4. Adiciona listeners
+            csvFileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    loadAndParseCSV(file);
+                }
+            });
+            document.getElementById('applyFilters').addEventListener('click', applyFilters);
+            document.getElementById('toggleCurveCash').addEventListener('click', toggleCurveCashFilter); // NOVO LISTENER
+            newTransactionForm.addEventListener('submit', handleManualFormSubmission);
+        }
+
+        // --- Inicialização da Aplicação ---
+        window.loadFirestoreTransactions = function() {
+            // Apenas para mostrar o ID do usuário, não carrega dados
+            if (window.isAuthReady) {
+                 userIdDisplay.textContent = `ID do Utilizador: ${window.userId}`;
+            }
         };
 
+        window.onload = initializeApp;
     </script>
 </body>
 </html>

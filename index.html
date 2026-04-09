@@ -1,5 +1,47 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
+<!-- PWA manifest -->
+<link rel="manifest" href="manifest.json">
+
+<script>
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(console.error);
+  }
+
+  // On load, check if a CSV was shared via Android Share
+  window.addEventListener('load', async () => {
+    if ('caches' in window) {
+      const cache = await caches.open('curve-v1');
+      const response = await cache.match('/__shared_csv__');
+      if (response) {
+        await cache.delete('/__shared_csv__'); // consume it
+        const text = await response.text();
+        const blob = new Blob([text], { type: 'text/csv' });
+        const file = new File([blob], 'shared.csv', { type: 'text/csv' });
+
+        // Trigger the existing CSV parser directly
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (r) => {
+            rawData = r.data.map(row => ({
+              date: row['Date (YYYY-MM-DD as UTC)'],
+              merchant: row['Merchant'] || '',
+              amountEur: parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0,
+              fundingCurrency: row['Txn Currency (Funding Card)'],
+              spendAmount: parseFloat(row['Txn Amount (Foreign Spend)']?.toString().replace(',', '.')) || 0,
+              spendCurrency: row['Txn Currency (Foreign Spend)'],
+              cardName: row['Card Name'],
+              csvCategory: row['Category']
+            }));
+            renderTable(rawData);
+          }
+        });
+      }
+    }
+  });
+</script>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">

@@ -1,317 +1,267 @@
 <!DOCTYPE html>
-<html lang="pt-PT">
-<!-- PWA manifest -->
-<link rel="manifest" href="manifest.json">
-
-<script>
-  // Register service worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(console.error);
-  }
-
-  // On load, check if a CSV was shared via Android Share
-  window.addEventListener('load', async () => {
-    if ('caches' in window) {
-      const cache = await caches.open('curve-v1');
-      const response = await cache.match('/__shared_csv__');
-      if (response) {
-        await cache.delete('/__shared_csv__'); // consume it
-        const text = await response.text();
-        const blob = new Blob([text], { type: 'text/csv' });
-        const file = new File([blob], 'shared.csv', { type: 'text/csv' });
-
-        // Trigger the existing CSV parser directly
-        Papa.parse(file, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (r) => {
-            rawData = r.data.map(row => ({
-              date: row['Date (YYYY-MM-DD as UTC)'],
-              merchant: row['Merchant'] || '',
-              amountEur: parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0,
-              fundingCurrency: row['Txn Currency (Funding Card)'],
-              spendAmount: parseFloat(row['Txn Amount (Foreign Spend)']?.toString().replace(',', '.')) || 0,
-              spendCurrency: row['Txn Currency (Foreign Spend)'],
-              cardName: row['Card Name'],
-              csvCategory: row['Category']
-            }));
-            renderTable(rawData);
-          }
-        });
-      }
-    }
-  });
-</script>
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciador Financeiro Curve</title>
-    <link rel="manifest" href="manifest.json">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        .card { border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e5e7eb; }
-        .scrollable-table { max-height: 600px; overflow-y: auto; }
-        .hidden-section { display: none; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerenciador Financeiro Curve</title>
+<link rel="manifest" href="manifest.json">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+.card { border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e5e7eb; }
+.scrollable-table { max-height: 600px; overflow-y: auto; }
+.hidden-section { display: none; }
+</style>
 </head>
 <body class="p-4 md:p-8">
+<div class="max-w-7xl mx-auto space-y-6">
 
-    <div class="max-w-7xl mx-auto space-y-6">
-        
-        <div class="flex flex-wrap gap-4 items-center justify-between bg-white p-6 card">
-            <div>
-                <h1 class="text-2xl font-black text-gray-800">Curve Finance Dashboard</h1>
-                <p class="text-xs text-gray-400 font-bold uppercase tracking-widest">Gestão de Transações Inteligente</p>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="toggleSection('toolsArea')" class="bg-indigo-100 text-indigo-700 font-black px-6 py-3 rounded-lg hover:bg-indigo-200 uppercase text-xs tracking-widest transition-all">
-                    🛠️ Configurações & Filtros
-                </button>
-                <label class="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-6 py-3 rounded-lg uppercase text-xs tracking-widest cursor-pointer shadow-md transition-all">
-                    📂 Importar CSV
-                    <input type="file" id="csvFileInput" accept=".csv" class="hidden">
-                </label>
-            </div>
-        </div>
+<div class="flex flex-wrap gap-4 items-center justify-between bg-white p-6 card">
+  <div>
+    <h1 class="text-2xl font-black text-gray-800">Curve Finance Dashboard</h1>
+    <p class="text-xs text-gray-400 font-bold uppercase tracking-widest">Gestão de Transações Inteligente</p>
+  </div>
+  <div class="flex gap-2">
+    <button onclick="toggleSection('toolsArea')" class="bg-indigo-100 text-indigo-700 font-black px-6 py-3 rounded-lg hover:bg-indigo-200 uppercase text-xs tracking-widest transition-all">
+      🛠️ Configurações & Filtros
+    </button>
+    <label class="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-6 py-3 rounded-lg uppercase text-xs tracking-widest cursor-pointer shadow-md transition-all">
+      📂 Importar CSV
+      <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+    </label>
+  </div>
+</div>
 
-        <div id="toolsArea" class="hidden-section space-y-6">
-            <div class="bg-white p-6 card border-t-4 border-slate-800">
-                <h2 class="text-xl font-bold text-slate-800 mb-4">Configuração do Google Forms</h2>
-                <input type="text" id="endpointUrl" class="w-full p-2 border rounded-lg bg-gray-50 font-mono text-sm" 
-                       value="https://docs.google.com/forms/d/e/1FAIpQLSfKuL6nzTceUZfUzidBwhizoFLBC3vyYT_OmncWfN99QTwhKQ/formResponse">
-            </div>
+<div id="toolsArea" class="hidden-section space-y-6">
+  <div class="bg-white p-6 card border-t-4 border-slate-800">
+    <h2 class="text-xl font-bold text-slate-800 mb-4">Configuração do Google Forms</h2>
+    <input type="text" id="endpointUrl" class="w-full p-2 border rounded-lg bg-gray-50 font-mono text-sm"
+      value="https://docs.google.com/forms/d/e/1FAIpQLSfKuL6nzTceUZfUzidBwhizoFLBC3vyYT_OmncWfN99QTwhKQ/formResponse">
+  </div>
 
-            <div class="bg-white p-6 card border-t-4 border-emerald-500">
-                <h2 class="text-xl font-bold text-emerald-600 mb-4">3. Nova Transação Manual</h2>
-                <form id="manualForm" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end" onsubmit="handleManualSubmit(event)">
-                    <div><label class="text-[10px] font-black uppercase text-gray-400">Data</label><input type="date" id="mDate" class="w-full p-2 border rounded-lg font-bold" required></div>
-                    <div><label class="text-[10px] font-black uppercase text-gray-400">Descrição</label><input type="text" id="mMerchant" class="w-full p-2 border rounded-lg font-bold" required></div>
-                    <div><label class="text-[10px] font-black uppercase text-gray-400">Valor (€)</label><input type="number" step="0.01" id="mAmount" class="w-full p-2 border rounded-lg font-bold" required></div>
-                    <div><label class="text-[10px] font-black uppercase text-gray-400">Categoria</label><select id="mCategory" class="w-full p-2 border rounded-lg font-bold"></select></div>
-                    <button type="submit" class="md:col-span-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3 rounded-lg uppercase tracking-widest text-xs">Enviar Manualmente</button>
-                </form>
-            </div>
+  <div class="bg-white p-6 card border-t-4 border-emerald-500">
+    <h2 class="text-xl font-bold text-emerald-600 mb-4">3. Nova Transação Manual</h2>
+    <form id="manualForm" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end" onsubmit="handleManualSubmit(event)">
+      <div><label class="text-[10px] font-black uppercase text-gray-400">Data</label><input type="date" id="mDate" class="w-full p-2 border rounded-lg font-bold" required></div>
+      <div><label class="text-[10px] font-black uppercase text-gray-400">Descrição</label><input type="text" id="mMerchant" class="w-full p-2 border rounded-lg font-bold" required></div>
+      <div><label class="text-[10px] font-black uppercase text-gray-400">Valor (€)</label><input type="number" step="0.01" id="mAmount" class="w-full p-2 border rounded-lg font-bold" required></div>
+      <div><label class="text-[10px] font-black uppercase text-gray-400">Categoria</label><select id="mCategory" class="w-full p-2 border rounded-lg font-bold"></select></div>
+      <button type="submit" class="md:col-span-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3 rounded-lg uppercase tracking-widest text-xs">Enviar Manualmente</button>
+    </form>
+  </div>
 
-            <div class="bg-white p-6 card border-t-4 border-indigo-600">
-                <h2 class="text-xl font-bold text-indigo-600 mb-4">4. Filtros</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <input type="date" id="filterStart" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold">
-                    <input type="date" id="filterEnd" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold">
-                    <select id="filterCat" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold"><option value="All">Todas as Categorias</option></select>
-                </div>
-                <button id="toggleBtn" onclick="toggleCurve()" class="w-full bg-slate-500 text-white font-black py-3 rounded-lg uppercase text-xs tracking-widest">Mostrar Curve Cash</button>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-white p-4 card border-l-4 border-red-500 flex justify-between items-center">
-                <div><p class="text-[10px] font-black text-gray-400 uppercase">Despesa</p><p id="statDespesa" class="text-2xl font-black text-gray-800">€ 0,00</p></div>
-                <div class="text-xl">➕</div>
-            </div>
-            <div class="bg-white p-4 card border-l-4 border-emerald-500 flex justify-between items-center">
-                <div><p class="text-[10px] font-black text-gray-400 uppercase">Entrada</p><p id="statEntrada" class="text-2xl font-black text-gray-800">€ 0,00</p></div>
-                <div class="text-xl">💎</div>
-            </div>
-            <div class="bg-white p-4 card border-l-4 border-blue-400 flex justify-between items-center">
-                <div><p class="text-[10px] font-black text-gray-400 uppercase">Saldo</p><p id="statSaldo" class="text-2xl font-black text-gray-800">€ 0,00</p></div>
-                <div class="text-xl">✅</div>
-            </div>
-            <div class="bg-white p-4 card border-l-4 border-indigo-500 flex justify-between items-center">
-                <div><p class="text-[10px] font-black text-gray-400 uppercase">Total</p><p id="statCount" class="text-2xl font-black text-gray-800">0</p></div>
-                <div class="text-xl">💳</div>
-            </div>
-        </div>
-
-        <div class="bg-white card overflow-hidden">
-            <div class="scrollable-table">
-                <table class="w-full text-left">
-                    <thead class="bg-gray-50 sticky top-0 border-b z-10">
-                        <tr>
-                            <th class="p-4 text-[10px] font-black text-gray-400 uppercase">Data</th>
-                            <th class="p-4 text-[10px] font-black text-gray-400 uppercase">Merchant</th>
-                            <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Valor</th>
-                            <th class="p-4 text-[10px] font-black text-gray-400 uppercase">Categoria</th>
-                            <th class="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody id="transactionsBody" class="divide-y divide-gray-100"></tbody>
-                </table>
-            </div>
-        </div>
+  <div class="bg-white p-6 card border-t-4 border-indigo-600">
+    <h2 class="text-xl font-bold text-indigo-600 mb-4">4. Filtros</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <input type="date" id="filterStart" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold">
+      <input type="date" id="filterEnd" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold">
+      <select id="filterCat" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold"><option value="All">Todas as Categorias</option></select>
     </div>
+    <button id="toggleBtn" onclick="toggleCurve()" class="w-full bg-slate-500 text-white font-black py-3 rounded-lg uppercase text-xs tracking-widest">Mostrar Curve Cash</button>
+  </div>
+</div>
 
-    <script>
-        const CATEGORIES = {
-            "Passes mensais": "🚌",
-            "Jantares": "🍽️",
-            "Subscrições": "📺",
-            "Shopping": "🛍️",
-            "Saúde": "🏥",
-            "Finanças": "🏦",
-            "Entretenimento": "🎭",
-            "Groceries": "🛒",
-            "Diversos": "📦",
-            "Viagens": "✈️",
-            "Roupa": "👕",
-            "Investimento": "📈",
-            "Almoços": "🍱",
-            "Cafés/Lanches": "☕",
-            "Casa": "🏠",
-            "Hobbies": "🎮"
-        };
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  <div class="bg-white p-4 card border-l-4 border-red-500 flex justify-between items-center">
+    <div><p class="text-[10px] font-black text-gray-400 uppercase">Despesa</p><p id="statDespesa" class="text-2xl font-black text-gray-800">€ 0,00</p></div>
+    <div class="text-xl">➕</div>
+  </div>
+  <div class="bg-white p-4 card border-l-4 border-emerald-500 flex justify-between items-center">
+    <div><p class="text-[10px] font-black text-gray-400 uppercase">Entrada</p><p id="statEntrada" class="text-2xl font-black text-gray-800">€ 0,00</p></div>
+    <div class="text-xl">💎</div>
+  </div>
+  <div class="bg-white p-4 card border-l-4 border-blue-400 flex justify-between items-center">
+    <div><p class="text-[10px] font-black text-gray-400 uppercase">Saldo</p><p id="statSaldo" class="text-2xl font-black text-gray-800">€ 0,00</p></div>
+    <div class="text-xl">✅</div>
+  </div>
+  <div class="bg-white p-4 card border-l-4 border-indigo-500 flex justify-between items-center">
+    <div><p class="text-[10px] font-black text-gray-400 uppercase">Total</p><p id="statCount" class="text-2xl font-black text-gray-800">0</p></div>
+    <div class="text-xl">💳</div>
+  </div>
+</div>
 
-        const RATE = 1.17; 
-        let rawData = [];
-        let hideCurve = true; 
+<div class="bg-white card overflow-hidden">
+  <div class="scrollable-table">
+    <table class="w-full text-left">
+      <thead class="bg-gray-50 sticky top-0 border-b z-10">
+        <tr>
+          <th class="p-4 text-[10px] font-black text-gray-400 uppercase">Data</th>
+          <th class="p-4 text-[10px] font-black text-gray-400 uppercase">Merchant</th>
+          <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Valor</th>
+          <th class="p-4 text-[10px] font-black text-gray-400 uppercase">Categoria</th>
+          <th class="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Ação</th>
+        </tr>
+      </thead>
+      <tbody id="transactionsBody" class="divide-y divide-gray-100"></tbody>
+    </table>
+  </div>
+</div>
 
-        // Init Dropdowns
-        const mCat = document.getElementById('mCategory');
-        const fCat = document.getElementById('filterCat');
-        Object.entries(CATEGORIES).forEach(([name, emoji]) => {
-            const opt = `<option value="${name}">${emoji} ${name}</option>`;
-            mCat.insertAdjacentHTML('beforeend', opt);
-            fCat.insertAdjacentHTML('beforeend', opt);
-        });
+</div>
 
-        function toggleSection(id) { document.getElementById(id).classList.toggle('hidden-section'); }
-        function toggleCurve() { 
-            hideCurve = !hideCurve; 
-            document.getElementById('toggleBtn').textContent = hideCurve ? "Mostrar Curve Cash" : "Ocultar Curve Cash";
-            renderTable(rawData); 
-        }
+<script>
+const CATEGORIES = {
+  "Passes mensais": "🚌",
+  "Jantares": "🍽️",
+  "Subscrições": "📺",
+  "Shopping": "🛍️",
+  "Saúde": "🏥",
+  "Finanças": "🏦",
+  "Entretenimento": "🎭",
+  "Groceries": "🛒",
+  "Diversos": "📦",
+  "Viagens": "✈️",
+  "Roupa": "👕",
+  "Investimento": "📈",
+  "Almoços": "🍱",
+  "Cafés/Lanches": "☕",
+  "Casa": "🏠",
+  "Hobbies": "🎮"
+};
 
-        // --- SMART CATEGORY GUESSER ---
-        function guessCategory(row) {
-            const m = row.merchant.toLowerCase();
-            const c = row.csvCategory || '';
+const RATE = 1.17;
+let rawData = [];
+let hideCurve = true;
 
-            if (c === 'Transport' || m.includes('uber') || m.includes('bolt') || m.includes('cp ') || m.includes('metropolitano')) return "Passes mensais";
-            if (c === 'Groceries' || m.includes('lidl') || m.includes('continente') || m.includes('pingo doce') || m.includes('auchan')) return "Groceries";
-            if (m.includes('netflix') || m.includes('spotify') || m.includes('apple.com') || m.includes('disney')) return "Subscrições";
-            if (c === 'Eating Out' && (m.includes('cafe') || m.includes('starbucks') || m.includes('padaria'))) return "Cafés/Lanches";
-            if (c === 'Eating Out') return "Jantares";
-            if (c === 'Shopping' || m.includes('amazon') || m.includes('zara') || m.includes('h&m')) return "Shopping";
-            if (c === 'Travel' || m.includes('airbn') || m.includes('booking')) return "Viagens";
-            if (c === 'Health' || m.includes('farmacia')) return "Saúde";
-            if (c === 'Finance') return "Finanças";
-            if (c === 'Entertainment') return "Entretenimento";
-            
-            return "Diversos"; // Default
-        }
+const mCat = document.getElementById('mCategory');
+const fCat = document.getElementById('filterCat');
+Object.entries(CATEGORIES).forEach(([name, emoji]) => {
+  const opt = `<option value="${name}">${emoji} ${name}</option>`;
+  mCat.insertAdjacentHTML('beforeend', opt);
+  fCat.insertAdjacentHTML('beforeend', opt);
+});
 
-        async function submitRow(btn, date, merchant, amount, category) {
-            const baseUrl = document.getElementById('endpointUrl').value;
-            const originalText = btn.innerText;
-            btn.disabled = true; btn.innerText = '...';
+function toggleSection(id) { document.getElementById(id).classList.toggle('hidden-section'); }
 
-            const formData = new FormData();
-            formData.append('entry.670590371', merchant);
-            formData.append('entry.322048028', amount.toString().replace('.', ','));
-            formData.append('entry.1886754321', category);
-            formData.append('entry.1696802376', date);
+function toggleCurve() {
+  hideCurve = !hideCurve;
+  document.getElementById('toggleBtn').textContent = hideCurve ? "Mostrar Curve Cash" : "Ocultar Curve Cash";
+  renderTable(rawData);
+}
 
-            try {
-                await fetch(baseUrl, { method: 'POST', mode: 'no-cors', body: formData });
-                btn.innerText = 'OK ✅';
-                btn.classList.replace('bg-indigo-600', 'bg-emerald-500');
-            } catch (err) {
-                alert('Erro na submissão.');
-                btn.disabled = false; btn.innerText = originalText;
-            }
-        }
+function guessCategory(row) {
+  const m = row.merchant.toLowerCase();
+  const c = row.csvCategory || '';
+  if (c === 'Transport' || m.includes('uber') || m.includes('bolt') || m.includes('cp ') || m.includes('metropolitano')) return "Passes mensais";
+  if (c === 'Groceries' || m.includes('lidl') || m.includes('continente') || m.includes('pingo doce') || m.includes('auchan')) return "Groceries";
+  if (m.includes('netflix') || m.includes('spotify') || m.includes('apple.com') || m.includes('disney')) return "Subscrições";
+  if (c === 'Eating Out' && (m.includes('cafe') || m.includes('starbucks') || m.includes('padaria'))) return "Cafés/Lanches";
+  if (c === 'Eating Out') return "Jantares";
+  if (c === 'Shopping' || m.includes('amazon') || m.includes('zara') || m.includes('h&m')) return "Shopping";
+  if (c === 'Travel' || m.includes('airbn') || m.includes('booking')) return "Viagens";
+  if (c === 'Health' || m.includes('farmacia')) return "Saúde";
+  if (c === 'Finance') return "Finanças";
+  if (c === 'Entertainment') return "Entretenimento";
+  return "Diversos";
+}
 
-        function handleManualSubmit(e) {
-            e.preventDefault();
-            submitRow(e.target.querySelector('button'), document.getElementById('mDate').value, document.getElementById('mMerchant').value, document.getElementById('mAmount').value, document.getElementById('mCategory').value);
-        }
+async function submitRow(btn, date, merchant, amount, category) {
+  const baseUrl = document.getElementById('endpointUrl').value;
+  const originalText = btn.innerText;
+  btn.disabled = true; btn.innerText = '...';
+  const formData = new FormData();
+  formData.append('entry.670590371', merchant);
+  formData.append('entry.322048028', amount.toString().replace('.', ','));
+  formData.append('entry.1886754321', category);
+  formData.append('entry.1696802376', date);
+  try {
+    await fetch(baseUrl, { method: 'POST', mode: 'no-cors', body: formData });
+    btn.innerText = 'OK ✅';
+    btn.classList.replace('bg-indigo-600', 'bg-emerald-500');
+  } catch (err) {
+    alert('Erro na submissão.');
+    btn.disabled = false; btn.innerText = originalText;
+  }
+}
 
-        function renderTable(data) {
-            const body = document.getElementById('transactionsBody');
-            body.innerHTML = '';
-            const start = document.getElementById('filterStart').value;
-            const end = document.getElementById('filterEnd').value;
+function handleManualSubmit(e) {
+  e.preventDefault();
+  submitRow(e.target.querySelector('button'), document.getElementById('mDate').value, document.getElementById('mMerchant').value, document.getElementById('mAmount').value, document.getElementById('mCategory').value);
+}
 
-            const filtered = data.filter(row => {
-                if (hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
-                if (start && row.date < start) return false;
-                if (end && row.date > end) return false;
-                return true;
-            });
+function parseAndRender(file) {
+  Papa.parse(file, {
+    header: true, skipEmptyLines: true,
+    complete: (r) => {
+      rawData = r.data.map(row => ({
+        date: row['Date (YYYY-MM-DD as UTC)'],
+        merchant: row['Merchant'] || '',
+        amountEur: parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0,
+        fundingCurrency: row['Txn Currency (Funding Card)'],
+        spendAmount: parseFloat(row['Txn Amount (Foreign Spend)']?.toString().replace(',', '.')) || 0,
+        spendCurrency: row['Txn Currency (Foreign Spend)'],
+        cardName: row['Card Name'],
+        csvCategory: row['Category']
+      }));
+      renderTable(rawData);
+    }
+  });
+}
 
-            let tDesp = 0, tEntr = 0;
+function renderTable(data) {
+  const body = document.getElementById('transactionsBody');
+  body.innerHTML = '';
+  const start = document.getElementById('filterStart').value;
+  const end = document.getElementById('filterEnd').value;
+  const filtered = data.filter(row => {
+    if (hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
+    if (start && row.date < start) return false;
+    if (end && row.date > end) return false;
+    return true;
+  });
+  let tDesp = 0, tEntr = 0;
+  filtered.forEach((row, i) => {
+    let valHtml = "";
+    let finalEur = row.amountEur;
+    const guessed = guessCategory(row);
+    if (row.fundingCurrency === 'CPT') {
+      const pts = Math.abs(row.amountEur);
+      const eur = pts * 0.01 * RATE;
+      valHtml = `<div class="text-emerald-600 font-bold">${pts}pts</div><div class="text-[10px] text-gray-400">(${eur.toFixed(2)}€)</div>`;
+      finalEur = eur;
+    } else if (row.spendCurrency !== 'EUR' && row.spendCurrency !== '') {
+      valHtml = `<div class="${finalEur < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${Math.abs(finalEur).toFixed(2)}€</div>
+        <div class="text-[10px] text-gray-400">(${Math.abs(row.spendAmount).toFixed(2)}${row.spendCurrency})</div>`;
+    } else {
+      valHtml = `<div class="${finalEur < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${Math.abs(finalEur).toFixed(2)}€</div>`;
+    }
+    if (finalEur < 0) tDesp += Math.abs(finalEur); else tEntr += finalEur;
+    const catId = `cat_${i}`;
+    body.insertAdjacentHTML('beforeend', `
+      <tr class="hover:bg-gray-50">
+        <td class="p-4 text-xs font-bold text-gray-400">${row.date}</td>
+        <td class="p-4"><div class="text-sm font-bold text-gray-800">${row.merchant}</div><div class="text-[9px] text-gray-400 uppercase font-black">${row.cardName || 'Curve'}</div></td>
+        <td class="p-4 text-right leading-tight">${valHtml}</td>
+        <td class="p-4">
+          <select id="${catId}" class="text-xs p-1.5 border rounded-lg bg-white font-bold w-full">
+            ${Object.entries(CATEGORIES).map(([name, emoji]) => `<option value="${name}" ${name === guessed ? 'selected' : ''}>${emoji} ${name}</option>`).join('')}
+          </select>
+        </td>
+        <td class="p-4 text-center">
+          <button onclick="submitRow(this, '${row.date}', '${row.merchant.replace(/'/g, "\\'")}', ${finalEur.toFixed(2)}, document.getElementById('${catId}').value)"
+            class="bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow">Submeter</button>
+        </td>
+      </tr>
+    `);
+  });
+  document.getElementById('statDespesa').textContent = `€ ${tDesp.toFixed(2)}`;
+  document.getElementById('statEntrada').textContent = `€ ${tEntr.toFixed(2)}`;
+  document.getElementById('statSaldo').textContent = `€ ${(tEntr - tDesp).toFixed(2)}`;
+  document.getElementById('statCount').textContent = filtered.length;
+}
 
-            filtered.forEach((row, i) => {
-                let valHtml = "";
-                let finalEur = row.amountEur;
-                const guessed = guessCategory(row);
-
-                if (row.fundingCurrency === 'CPT') {
-                    const pts = Math.abs(row.amountEur);
-                    const eur = pts * 0.01 * RATE;
-                    valHtml = `<div class="text-emerald-600 font-bold">${pts}pts</div><div class="text-[10px] text-gray-400">(${eur.toFixed(2)}€)</div>`;
-                    finalEur = eur;
-                } else if (row.spendCurrency !== 'EUR' && row.spendCurrency !== '') {
-                    valHtml = `<div class="${finalEur < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${Math.abs(finalEur).toFixed(2)}€</div>
-                               <div class="text-[10px] text-gray-400">(${Math.abs(row.spendAmount).toFixed(2)}${row.spendCurrency})</div>`;
-                } else {
-                    valHtml = `<div class="${finalEur < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${Math.abs(finalEur).toFixed(2)}€</div>`;
-                }
-
-                if (finalEur < 0) tDesp += Math.abs(finalEur); else tEntr += finalEur;
-
-                const catId = `cat_${i}`;
-                body.insertAdjacentHTML('beforeend', `
-                    <tr class="hover:bg-gray-50">
-                        <td class="p-4 text-xs font-bold text-gray-400">${row.date}</td>
-                        <td class="p-4"><div class="text-sm font-bold text-gray-800">${row.merchant}</div><div class="text-[9px] text-gray-400 uppercase font-black">${row.cardName || 'Curve'}</div></td>
-                        <td class="p-4 text-right leading-tight">${valHtml}</td>
-                        <td class="p-4">
-                            <select id="${catId}" class="text-xs p-1.5 border rounded-lg bg-white font-bold w-full">
-                                ${Object.entries(CATEGORIES).map(([name, emoji]) => `<option value="${name}" ${name === guessed ? 'selected' : ''}>${emoji} ${name}</option>`).join('')}
-                            </select>
-                        </td>
-                        <td class="p-4 text-center">
-                            <button onclick="submitRow(this, '${row.date}', '${row.merchant.replace(/'/g, "\\'")}', ${finalEur.toFixed(2)}, document.getElementById('${catId}').value)" 
-                                    class="bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow">Submeter</button>
-                        </td>
-                    </tr>
-                `);
-            });
-
-            document.getElementById('statDespesa').textContent = `€ ${tDesp.toFixed(2)}`;
-            document.getElementById('statEntrada').textContent = `€ ${tEntr.toFixed(2)}`;
-            document.getElementById('statSaldo').textContent = `€ ${(tEntr - tDesp).toFixed(2)}`;
-            document.getElementById('statCount').textContent = filtered.length;
-        }
-
-        document.getElementById('csvFileInput').onchange = (e) => {
-            Papa.parse(e.target.files[0], {
-                header: true, skipEmptyLines: true,
-                complete: (r) => {
-                    rawData = r.data.map(row => ({
-                        date: row['Date (YYYY-MM-DD as UTC)'],
-                        merchant: row['Merchant'] || '',
-                        amountEur: parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0,
-                        fundingCurrency: row['Txn Currency (Funding Card)'],
-                        spendAmount: parseFloat(row['Txn Amount (Foreign Spend)']?.toString().replace(',', '.')) || 0,
-                        spendCurrency: row['Txn Currency (Foreign Spend)'],
-                        cardName: row['Card Name'],
-                        csvCategory: row['Category'] // PULLING THE CURVE CATEGORY
-                    }));
-                    renderTable(rawData);
-                }
-            });
-        };
+document.getElementById('csvFileInput').onchange = (e) => parseAndRender(e.target.files[0]);
 </script>
 
 <script>
+  // Register Service Worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(console.error);
   }
 
+  // Handle CSV shared via Android Share Target
   window.addEventListener('load', async () => {
     if ('caches' in window) {
       try {
@@ -322,24 +272,11 @@
           const text = await response.text();
           const blob = new Blob([text], { type: 'text/csv' });
           const file = new File([blob], 'shared.csv', { type: 'text/csv' });
-          Papa.parse(file, {
-            header: true, skipEmptyLines: true,
-            complete: (r) => {
-              rawData = r.data.map(row => ({
-                date: row['Date (YYYY-MM-DD as UTC)'],
-                merchant: row['Merchant'] || '',
-                amountEur: parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0,
-                fundingCurrency: row['Txn Currency (Funding Card)'],
-                spendAmount: parseFloat(row['Txn Amount (Foreign Spend)']?.toString().replace(',', '.')) || 0,
-                spendCurrency: row['Txn Currency (Foreign Spend)'],
-                cardName: row['Card Name'],
-                csvCategory: row['Category']
-              }));
-              renderTable(rawData);
-            }
-          });
+          parseAndRender(file);
         }
-      } catch(e) { console.log('No shared file found'); }
+      } catch(e) {
+        console.log('No shared file:', e);
+      }
     }
   });
 </script>

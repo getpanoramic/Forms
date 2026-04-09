@@ -1,0 +1,33 @@
+{
+  "name": "Curve Finance Dashboard",
+  "short_name": "Curve",
+  "start_url": "/Forms/",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/getpanoramic/Forms/main/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/getpanoramic/Forms/main/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "share_target": {
+    "action": "/Forms/",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "csv_file",
+          "accept": ["text/csv", ".csv"]
+        }
+      ]
+    }
+  }
+}

@@ -1,7 +1,7 @@
 {
   "name": "Curve Finance",
   "short_name": "Curve",
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#f3f4f6",
   "theme_color": "#6366f1",
@@ -9,7 +9,8 @@
     {
       "src": "https://cdn-icons-png.flaticon.com/512/10438/10438069.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
   "share_target": {
@@ -22,9 +23,9 @@
           "name": "csv_file",
           "accept": [
             "text/csv",
-            ".csv",
             "application/csv",
-            "text/comma-separated-values"
+            "text/comma-separated-values",
+            ".csv"
           ]
         }
       ]

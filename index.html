@@ -272,15 +272,17 @@ if ('serviceWorker' in navigator) {
 }
 
 // PWA: Handle Shared CSV files
+// Inside your window 'load' listener in index.html
 window.addEventListener('load', async () => {
   if ('caches' in window) {
-    const cache = await caches.open('curve-v1');
-    const response = await cache.match('/__shared_csv__');
+    const cache = await caches.open('curve-v3'); // Match the version in sw.js
+    const response = await cache.match('/Forms/__shared_csv__'); // Added /Forms/
+    
     if (response) {
-      await cache.delete('/__shared_csv__');
+      await cache.delete('/Forms/__shared_csv__');
       const text = await response.text();
       const blob = new Blob([text], { type: 'text/csv' });
-      const file = new File([blob], 'shared_incoming.csv', { type: 'text/csv' });
+      const file = new File([blob], 'shared.csv', { type: 'text/csv' });
       parseAndRender(file);
       document.getElementById('toolsArea').classList.remove('hidden-section');
     }

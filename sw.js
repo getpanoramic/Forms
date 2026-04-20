@@ -1,10 +1,11 @@
-const CACHE_NAME = 'curve-v2';
+const CACHE_NAME = 'curve-v3';
 
 self.addEventListener('install', (e) => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method === 'POST') {
+  // Check if the request is a POST to our specific subfolder
+  if (event.request.method === 'POST' && event.request.url.includes('/Forms/')) {
     event.respondWith((async () => {
       try {
         const formData = await event.request.formData();
@@ -12,10 +13,11 @@ self.addEventListener('fetch', (event) => {
         if (file) {
           const cache = await caches.open(CACHE_NAME);
           const text = await file.text();
-          await cache.put('/__shared_csv__', new Response(text));
+          // Store it with the subfolder path
+          await cache.put('/Forms/__shared_csv__', new Response(text));
         }
-        // Use a 303 redirect to turn the POST into a GET
-        return Response.redirect('/', 303);
+        // Redirect back to the subfolder index
+        return Response.redirect('/Forms/', 303);
       } catch (err) {
         return fetch(event.request);
       }

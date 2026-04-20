@@ -1,32 +1,27 @@
-const CACHE = 'curve-v1';
+const CACHE_NAME = 'curve-v1';
 
-self.addEventListener('install', e => {
-  self.skipWaiting();
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE_NAME));
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(clients.claim());
-});
-
-// Handle the incoming share POST request
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-
-  if (e.request.method === 'POST' && url.pathname === '/Forms/') {
-    e.respondWith((async () => {
-      const formData = await e.request.formData();
+self.addEventListener('fetch', (event) => {
+  // Check if this is a POST request from the Share Target
+  if (event.request.method === 'POST' && event.request.url.includes('/')) {
+    event.respondWith((async () => {
+      const formData = await event.request.formData();
       const file = formData.get('csv_file');
-
-      if (file) {
-        // Store the file temporarily so the page can pick it up
-        const cache = await caches.open(CACHE);
-        await cache.put('/__shared_csv__', new Response(file, {
-          headers: { 'Content-Type': 'text/csv' }
-        }));
-      }
-
-      // Redirect to the app
-      return Response.redirect('/Forms/', 303);
+      
+      // Store the file in cache so the main page can grab it after redirect
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put('/__shared_csv__', new Response(await file.text()));
+      
+      // Redirect to the main page to process the file
+      return Response.redirect('/', 303);
     })());
+    return;
   }
+  
+  event.respondWith(
+    fetch(event.request).catch(() => caches.match(event.request))
+  );
 });

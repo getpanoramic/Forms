@@ -113,6 +113,7 @@ const RATE = 1.17;
 let rawData = [];
 let hideCurve = true;
 
+// Setup UI categories
 const mCat = document.getElementById('mCategory');
 const fCat = document.getElementById('filterCat');
 Object.entries(CATEGORIES).forEach(([name, emoji]) => {
@@ -145,53 +146,40 @@ function guessCategory(row) {
   return "Diversos";
 }
 
-// THE FIX: Improved submission function
+// Logic to send data to Google Forms
 async function submitRow(btn, date, merchant, amount, category) {
   const baseUrl = document.getElementById('endpointUrl').value;
   const originalText = btn.innerText;
-  const originalClass = btn.className;
-
-  btn.disabled = true; 
-  btn.innerText = '...';
+  
+  btn.disabled = true; btn.innerText = '...';
 
   const formData = new URLSearchParams();
-  // IMPORTANT: Verify these IDs match your Form's "name" attributes
+  // IMPORTANT: Verify these IDs match your specific Google Form
   formData.append('entry.670590371', merchant);
   formData.append('entry.322048028', amount.toString().replace('.', ','));
   formData.append('entry.1886754321', category);
   formData.append('entry.1696802376', date);
 
   try {
-    await fetch(baseUrl, {
-      method: 'POST',
-      mode: 'no-cors',
+    await fetch(baseUrl, { 
+      method: 'POST', 
+      mode: 'no-cors', 
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: formData.toString()
+      body: formData.toString() 
     });
-    
     btn.innerText = 'OK ✅';
     btn.className = "bg-emerald-500 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow";
   } catch (err) {
-    console.error(err);
     alert('Erro na submissão.');
-    btn.disabled = false; 
-    btn.innerText = originalText;
+    btn.disabled = false; btn.innerText = originalText;
   }
 }
 
 function handleManualSubmit(e) {
   e.preventDefault();
-  const btn = e.target.querySelector('button');
-  submitRow(
-    btn, 
-    document.getElementById('mDate').value, 
-    document.getElementById('mMerchant').value, 
-    document.getElementById('mAmount').value, 
-    document.getElementById('mCategory').value
-  );
+  submitRow(e.target.querySelector('button'), document.getElementById('mDate').value, document.getElementById('mMerchant').value, document.getElementById('mAmount').value, document.getElementById('mCategory').value);
 }
 
-// NEW: Helper for table buttons to avoid string escaping issues
 function handleTableSubmit(btn, date, merchant, amount, selectId) {
   const category = document.getElementById(selectId).value;
   submitRow(btn, date, merchant, amount, category);
@@ -277,6 +265,27 @@ function renderTable(data) {
 }
 
 document.getElementById('csvFileInput').onchange = (e) => parseAndRender(e.target.files[0]);
+
+// PWA: Service Worker Registration
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(console.error);
+}
+
+// PWA: Handle Shared CSV files
+window.addEventListener('load', async () => {
+  if ('caches' in window) {
+    const cache = await caches.open('curve-v1');
+    const response = await cache.match('/__shared_csv__');
+    if (response) {
+      await cache.delete('/__shared_csv__');
+      const text = await response.text();
+      const blob = new Blob([text], { type: 'text/csv' });
+      const file = new File([blob], 'shared_incoming.csv', { type: 'text/csv' });
+      parseAndRender(file);
+      document.getElementById('toolsArea').classList.remove('hidden-section');
+    }
+  }
+});
 </script>
 </body>
 </html>

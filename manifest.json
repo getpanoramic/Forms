@@ -1,7 +1,8 @@
 {
   "name": "Curve Finance",
   "short_name": "Curve",
-  "start_url": "/",
+  "start_url": "/Forms/",
+  "scope": "/Forms/",
   "display": "standalone",
   "background_color": "#f3f4f6",
   "theme_color": "#6366f1",
@@ -14,19 +15,14 @@
     }
   ],
   "share_target": {
-    "action": "/",
+    "action": "/Forms/",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
       "files": [
         {
           "name": "csv_file",
-          "accept": [
-            "text/csv",
-            "application/csv",
-            "text/comma-separated-values",
-            ".csv"
-          ]
+          "accept": ["text/csv", ".csv", "application/csv"]
         }
       ]
     }

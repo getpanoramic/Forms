@@ -103,22 +103,10 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
 
 <script>
 const CATEGORIES = {
-  "Passes mensais": "🚌",
-  "Jantares": "🍽️",
-  "Subscrições": "📺",
-  "Shopping": "🛍️",
-  "Saúde": "🏥",
-  "Finanças": "🏦",
-  "Entretenimento": "🎭",
-  "Groceries": "🛒",
-  "Diversos": "📦",
-  "Viagens": "✈️",
-  "Roupa": "👕",
-  "Investimento": "📈",
-  "Almoços": "🍱",
-  "Cafés/Lanches": "☕",
-  "Casa": "🏠",
-  "Hobbies": "🎮"
+  "Passes mensais": "🚌", "Jantares": "🍽️", "Subscrições": "📺", "Shopping": "🛍️",
+  "Saúde": "🏥", "Finanças": "🏦", "Entretenimento": "🎭", "Groceries": "🛒",
+  "Diversos": "📦", "Viagens": "✈️", "Roupa": "👕", "Investimento": "📈",
+  "Almoços": "🍱", "Cafés/Lanches": "☕", "Casa": "🏠", "Hobbies": "🎮"
 };
 
 const RATE = 1.17;
@@ -157,28 +145,56 @@ function guessCategory(row) {
   return "Diversos";
 }
 
+// THE FIX: Improved submission function
 async function submitRow(btn, date, merchant, amount, category) {
   const baseUrl = document.getElementById('endpointUrl').value;
   const originalText = btn.innerText;
-  btn.disabled = true; btn.innerText = '...';
-  const formData = new FormData();
+  const originalClass = btn.className;
+
+  btn.disabled = true; 
+  btn.innerText = '...';
+
+  const formData = new URLSearchParams();
+  // IMPORTANT: Verify these IDs match your Form's "name" attributes
   formData.append('entry.670590371', merchant);
   formData.append('entry.322048028', amount.toString().replace('.', ','));
   formData.append('entry.1886754321', category);
   formData.append('entry.1696802376', date);
+
   try {
-    await fetch(baseUrl, { method: 'POST', mode: 'no-cors', body: formData });
+    await fetch(baseUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString()
+    });
+    
     btn.innerText = 'OK ✅';
-    btn.classList.replace('bg-indigo-600', 'bg-emerald-500');
+    btn.className = "bg-emerald-500 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow";
   } catch (err) {
+    console.error(err);
     alert('Erro na submissão.');
-    btn.disabled = false; btn.innerText = originalText;
+    btn.disabled = false; 
+    btn.innerText = originalText;
   }
 }
 
 function handleManualSubmit(e) {
   e.preventDefault();
-  submitRow(e.target.querySelector('button'), document.getElementById('mDate').value, document.getElementById('mMerchant').value, document.getElementById('mAmount').value, document.getElementById('mCategory').value);
+  const btn = e.target.querySelector('button');
+  submitRow(
+    btn, 
+    document.getElementById('mDate').value, 
+    document.getElementById('mMerchant').value, 
+    document.getElementById('mAmount').value, 
+    document.getElementById('mCategory').value
+  );
+}
+
+// NEW: Helper for table buttons to avoid string escaping issues
+function handleTableSubmit(btn, date, merchant, amount, selectId) {
+  const category = document.getElementById(selectId).value;
+  submitRow(btn, date, merchant, amount, category);
 }
 
 function parseAndRender(file) {
@@ -205,17 +221,20 @@ function renderTable(data) {
   body.innerHTML = '';
   const start = document.getElementById('filterStart').value;
   const end = document.getElementById('filterEnd').value;
+  
   const filtered = data.filter(row => {
     if (hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
     if (start && row.date < start) return false;
     if (end && row.date > end) return false;
     return true;
   });
+
   let tDesp = 0, tEntr = 0;
   filtered.forEach((row, i) => {
     let valHtml = "";
     let finalEur = row.amountEur;
     const guessed = guessCategory(row);
+    
     if (row.fundingCurrency === 'CPT') {
       const pts = Math.abs(row.amountEur);
       const eur = pts * 0.01 * RATE;
@@ -227,8 +246,12 @@ function renderTable(data) {
     } else {
       valHtml = `<div class="${finalEur < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${Math.abs(finalEur).toFixed(2)}€</div>`;
     }
+
     if (finalEur < 0) tDesp += Math.abs(finalEur); else tEntr += finalEur;
+    
     const catId = `cat_${i}`;
+    const merchantSafe = row.merchant.replace(/'/g, "").replace(/"/g, "");
+
     body.insertAdjacentHTML('beforeend', `
       <tr class="hover:bg-gray-50">
         <td class="p-4 text-xs font-bold text-gray-400">${row.date}</td>
@@ -240,12 +263,13 @@ function renderTable(data) {
           </select>
         </td>
         <td class="p-4 text-center">
-          <button onclick="submitRow(this, '${row.date}', '${row.merchant.replace(/'/g, "\\'")}', ${finalEur.toFixed(2)}, document.getElementById('${catId}').value)"
+          <button onclick="handleTableSubmit(this, '${row.date}', '${merchantSafe}', ${finalEur.toFixed(2)}, '${catId}')"
             class="bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow">Submeter</button>
         </td>
       </tr>
     `);
   });
+
   document.getElementById('statDespesa').textContent = `€ ${tDesp.toFixed(2)}`;
   document.getElementById('statEntrada').textContent = `€ ${tEntr.toFixed(2)}`;
   document.getElementById('statSaldo').textContent = `€ ${(tEntr - tDesp).toFixed(2)}`;
@@ -254,32 +278,5 @@ function renderTable(data) {
 
 document.getElementById('csvFileInput').onchange = (e) => parseAndRender(e.target.files[0]);
 </script>
-
-<script>
-  // Register Service Worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(console.error);
-  }
-
-  // Handle CSV shared via Android Share Target
-  window.addEventListener('load', async () => {
-    if ('caches' in window) {
-      try {
-        const cache = await caches.open('curve-v1');
-        const response = await cache.match('/__shared_csv__');
-        if (response) {
-          await cache.delete('/__shared_csv__');
-          const text = await response.text();
-          const blob = new Blob([text], { type: 'text/csv' });
-          const file = new File([blob], 'shared.csv', { type: 'text/csv' });
-          parseAndRender(file);
-        }
-      } catch(e) {
-        console.log('No shared file:', e);
-      }
-    }
-  });
-</script>
-
 </body>
 </html>

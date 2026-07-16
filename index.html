@@ -206,7 +206,7 @@ async function parseAndRender(file) {
   Papa.parse(file, {
     header: true, skipEmptyLines: true,
     complete: async (r) => {
-      rawData = r.data.map(row => ({
+      const parsedData = r.data.map(row => ({
         id: crypto.randomUUID(), // Add unique ID for IndexedDB
         date: row['Date (YYYY-MM-DD as UTC)'],
         merchant: row['Merchant'] || '',
@@ -217,6 +217,7 @@ async function parseAndRender(file) {
         cardName: row['Card Name'],
         csvCategory: row['Category']
       }));
+      rawData = parsedData;
       await saveTransactions(rawData);
       renderTable(rawData);
     }

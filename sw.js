@@ -38,7 +38,8 @@ self.addEventListener('fetch', (event) => {
         }
         return Response.redirect('/Forms/', 303);
       } catch (err) {
-        return fetch(event.request);
+        console.error('SW fetch error:', err);
+        return new Response('Error processing request', { status: 500 });
       }
     })());
   } else {

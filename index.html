@@ -102,23 +102,34 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
 </div>
 
 <script type="module">
-import { CATEGORIES, RATE } from './js/config.js';
+import { CATEGORIES } from './js/config.js';
 import { guessCategory } from './js/dataProcessor.js';
+import { showToast, setLoading } from './js/uiUtils.js';
+import { getExchangeRate } from './js/api.js';
 
 let rawData = [];
 let hideCurve = true;
+let RATE = 1.17;
+
+(async () => {
+  setLoading(true);
+  RATE = await getExchangeRate();
+  setLoading(false);
+})();
 
 // Global variables needed by the HTML handlers
 window.CATEGORIES = CATEGORIES;
 window.RATE = RATE;
 window.guessCategory = guessCategory;
-window.rawData = rawData; // Expose for filter listeners
+window.rawData = rawData; 
 window.hideCurve = hideCurve;
 window.toggleSection = toggleSection;
 window.toggleCurve = toggleCurve;
 window.handleManualSubmit = handleManualSubmit;
 window.handleTableSubmit = handleTableSubmit;
 window.renderTable = renderTable;
+window.showToast = showToast;
+window.setLoading = setLoading;
 const mCat = document.getElementById('mCategory');
 const fCat = document.getElementById('filterCat');
 Object.entries(CATEGORIES).forEach(([name, emoji]) => {
@@ -137,6 +148,11 @@ function toggleCurve() {
 
 // Logic to send data to Google Forms
 async function submitRow(btn, date, merchant, amount, category) {
+  if (!date || !merchant || !amount) {
+    showToast('Preencha todos os campos!', 'error');
+    return;
+  }
+  
   const baseUrl = document.getElementById('endpointUrl').value;
   const originalText = btn.innerText;
   
@@ -150,16 +166,19 @@ async function submitRow(btn, date, merchant, amount, category) {
   formData.append('entry.1696802376', date);
 
   try {
+    setLoading(true);
     await fetch(baseUrl, { 
       method: 'POST', 
       mode: 'no-cors', 
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formData.toString() 
     });
+    setLoading(false);
     btn.innerText = 'OK ✅';
-    btn.className = "bg-emerald-500 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow";
+    showToast('Transação enviada com sucesso!', 'success');
   } catch (err) {
-    alert('Erro na submissão.');
+    setLoading(false);
+    showToast('Erro na submissão.', 'error');
     btn.disabled = false; btn.innerText = originalText;
   }
 }

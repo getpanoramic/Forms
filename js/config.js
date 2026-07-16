@@ -4,5 +4,3 @@ export const CATEGORIES = {
   "Diversos": "📦", "Viagens": "✈️", "Roupa": "👕", "Investimento": "📈",
   "Almoços": "🍱", "Cafés/Lanches": "☕", "Casa": "🏠", "Hobbies": "🎮"
 };
-
-export const RATE = 1.17;

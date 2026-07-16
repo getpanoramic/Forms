@@ -101,19 +101,24 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
 
 </div>
 
-<script>
-const CATEGORIES = {
-  "Passes mensais": "🚌", "Jantares": "🍽️", "Subscrições": "📺", "Shopping": "🛍️",
-  "Saúde": "🏥", "Finanças": "🏦", "Entretenimento": "🎭", "Groceries": "🛒",
-  "Diversos": "📦", "Viagens": "✈️", "Roupa": "👕", "Investimento": "📈",
-  "Almoços": "🍱", "Cafés/Lanches": "☕", "Casa": "🏠", "Hobbies": "🎮"
-};
+<script type="module">
+import { CATEGORIES, RATE } from './js/config.js';
+import { guessCategory } from './js/dataProcessor.js';
 
-const RATE = 1.17;
 let rawData = [];
 let hideCurve = true;
 
-// Setup UI categories
+// Global variables needed by the HTML handlers
+window.CATEGORIES = CATEGORIES;
+window.RATE = RATE;
+window.guessCategory = guessCategory;
+window.rawData = rawData; // Expose for filter listeners
+window.hideCurve = hideCurve;
+window.toggleSection = toggleSection;
+window.toggleCurve = toggleCurve;
+window.handleManualSubmit = handleManualSubmit;
+window.handleTableSubmit = handleTableSubmit;
+window.renderTable = renderTable;
 const mCat = document.getElementById('mCategory');
 const fCat = document.getElementById('filterCat');
 Object.entries(CATEGORIES).forEach(([name, emoji]) => {
@@ -128,22 +133,6 @@ function toggleCurve() {
   hideCurve = !hideCurve;
   document.getElementById('toggleBtn').textContent = hideCurve ? "Mostrar Curve Cash" : "Ocultar Curve Cash";
   renderTable(rawData);
-}
-
-function guessCategory(row) {
-  const m = row.merchant.toLowerCase();
-  const c = row.csvCategory || '';
-  if (c === 'Transport' || m.includes('uber') || m.includes('bolt') || m.includes('cp ') || m.includes('metropolitano')) return "Passes mensais";
-  if (c === 'Groceries' || m.includes('lidl') || m.includes('continente') || m.includes('pingo doce') || m.includes('auchan')) return "Groceries";
-  if (m.includes('netflix') || m.includes('spotify') || m.includes('apple.com') || m.includes('disney')) return "Subscrições";
-  if (c === 'Eating Out' && (m.includes('cafe') || m.includes('starbucks') || m.includes('padaria'))) return "Cafés/Lanches";
-  if (c === 'Eating Out') return "Jantares";
-  if (c === 'Shopping' || m.includes('amazon') || m.includes('zara') || m.includes('h&m')) return "Shopping";
-  if (c === 'Travel' || m.includes('airbn') || m.includes('booking')) return "Viagens";
-  if (c === 'Health' || m.includes('farmacia')) return "Saúde";
-  if (c === 'Finance') return "Finanças";
-  if (c === 'Entertainment') return "Entretenimento";
-  return "Diversos";
 }
 
 // Logic to send data to Google Forms

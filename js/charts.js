@@ -1,11 +1,10 @@
 // Using the UMD bundle which includes all dependencies to avoid resolution errors
 import 'https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.js';
 
-let chart;
+let chartCat, chartTime;
 
-export function initChart(data) {
-  console.log('DEBUG: initChart called.');
-  // Access Chart from the global scope (since it's a UMD bundle)
+export function initCharts(data) {
+  console.log('DEBUG: initCharts called.');
   const ChartInstance = window.Chart;
   
   if (!ChartInstance) {
@@ -14,40 +13,57 @@ export function initChart(data) {
   }
 
   try {
-    const canvas = document.getElementById('chart');
-    if (!canvas) {
-        console.error('DEBUG: Chart canvas element not found.');
-        return;
-    }
-    const ctx = canvas.getContext('2d');
-    
-    // Prepare data (category totals)
+    // Prepare Category Data
     const categoryTotals = {};
-    console.log('DEBUG: Processing data for chart, first 5 rows:', data.slice(0, 5));
+    const timelineData = {};
+    
     data.forEach(t => {
-      // Allow positive amounts if they should be tracked, or check if amountEur is always positive.
-      // If all values are positive, we should plot everything.
       const cat = t.csvCategory || 'Diversos';
       categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(t.amountEur);
+      
+      const date = t.date;
+      timelineData[date] = (timelineData[date] || 0) + Math.abs(t.amountEur);
     });
 
-    console.log('DEBUG: Chart data prepared:', categoryTotals);
+    // Render Category Chart
+    const canvasCat = document.getElementById('chartCategory');
+    if (canvasCat) {
+        if (chartCat) chartCat.destroy();
+        chartCat = new ChartInstance(canvasCat.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: Object.keys(categoryTotals),
+            datasets: [{
+            label: 'Despesas por Categoria',
+            data: Object.values(categoryTotals),
+            backgroundColor: 'rgba(99, 102, 241, 0.5)',
+            }]
+        },
+        options: { responsive: true }
+        });
+    }
 
-    if (chart) chart.destroy();
-    chart = new ChartInstance(ctx, {
-      type: 'bar',
-      data: {
-        labels: Object.keys(categoryTotals),
-        datasets: [{
-          label: 'Despesas por Categoria',
-          data: Object.values(categoryTotals),
-          backgroundColor: 'rgba(99, 102, 241, 0.5)',
-        }]
-      },
-      options: { responsive: true }
-    });
-    console.log('DEBUG: Chart rendered.');
+    // Render Timeline Chart
+    const canvasTime = document.getElementById('chartTime');
+    if (canvasTime) {
+        if (chartTime) chartTime.destroy();
+        const sortedDates = Object.keys(timelineData).sort();
+        chartTime = new ChartInstance(canvasTime.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: sortedDates,
+            datasets: [{
+            label: 'Gastos por Dia (EUR)',
+            data: sortedDates.map(d => timelineData[d]),
+            borderColor: 'rgba(16, 185, 129, 1)',
+            tension: 0.1
+            }]
+        },
+        options: { responsive: true }
+        });
+    }
+    console.log('DEBUG: Charts rendered.');
   } catch (err) {
-    console.error('DEBUG: Failed to initialize chart:', err);
+    console.error('DEBUG: Failed to initialize charts:', err);
   }
 }

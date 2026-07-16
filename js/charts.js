@@ -1,8 +1,12 @@
-import Chart from 'https://cdn.jsdelivr.net/npm/chart.js/auto/auto.min.js';
+// Using the UMD bundle which includes all dependencies to avoid resolution errors
+import 'https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.js';
 
 let chart;
 
 export function initChart(data) {
+  // Access Chart from the global scope (since it's a UMD bundle)
+  const ChartInstance = window.Chart;
+  
   try {
     const canvas = document.getElementById('chart');
     if (!canvas) return;
@@ -18,7 +22,7 @@ export function initChart(data) {
     });
 
     if (chart) chart.destroy();
-    chart = new Chart(ctx, {
+    chart = new ChartInstance(ctx, {
       type: 'bar',
       data: {
         labels: Object.keys(categoryTotals),

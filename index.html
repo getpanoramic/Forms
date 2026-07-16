@@ -91,8 +91,8 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
       <table class="w-full text-left">
         <thead class="bg-gray-50 sticky top-0 border-b z-10">
           <tr>
-            <th class="p-4 text-[10px] font-black text-gray-400 uppercase">Data</th>
-            <th class="p-4 text-[10px] font-black text-gray-400 uppercase">Merchant</th>
+            <th class="p-4 text-[10px] font-black text-gray-400 uppercase cursor-pointer" onclick="sortTable('date')">Data ↕️</th>
+            <th class="p-4 text-[10px] font-black text-gray-400 uppercase cursor-pointer" onclick="sortTable('merchant')">Merchant ↕️</th>
             <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Valor</th>
             <th class="p-4 text-[10px] font-black text-gray-400 uppercase">Categoria</th>
             <th class="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Ação</th>
@@ -237,6 +237,8 @@ async function parseAndRender(file) {
   });
 }
 
+let sortConfig = { key: 'date', direction: 'desc' };
+
 function renderTable(data) {
   console.log('DEBUG: renderTable called with length:', data.length);
   const body = document.getElementById('transactionsBody');
@@ -244,19 +246,27 @@ function renderTable(data) {
   const start = document.getElementById('filterStart').value;
   const end = document.getElementById('filterEnd').value;
   
-  const filtered = data.filter(row => {
+  let filtered = data.filter(row => {
     if (hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
     if (start && row.date < start) return false;
     if (end && row.date > end) return false;
     return true;
   });
+
+  // Sorting
+  filtered.sort((a, b) => {
+    if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   console.log('DEBUG: Filtered data length:', filtered.length);
 
   let tDesp = 0, tEntr = 0;
   filtered.forEach((row, i) => {
     let valHtml = "";
     let finalEur = row.amountEur;
-    const guessed = guessCategory(row);
+    const guessed = row.csvCategory || guessCategory(row);
     
     if (row.fundingCurrency === 'CPT') {
       const pts = Math.abs(row.amountEur);
@@ -298,6 +308,16 @@ function renderTable(data) {
   document.getElementById('statSaldo').textContent = `€ ${(tEntr - tDesp).toFixed(2)}`;
   document.getElementById('statCount').textContent = filtered.length;
   initChart(filtered);
+}
+
+function sortTable(key) {
+  if (sortConfig.key === key) {
+    sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortConfig.key = key;
+    sortConfig.direction = 'desc';
+  }
+  renderTable(rawData);
 }
 
 document.getElementById('csvFileInput').onchange = (e) => parseAndRender(e.target.files[0]);

@@ -4,12 +4,21 @@ import 'https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.js';
 let chart;
 
 export function initChart(data) {
+  console.log('DEBUG: initChart called.');
   // Access Chart from the global scope (since it's a UMD bundle)
   const ChartInstance = window.Chart;
   
+  if (!ChartInstance) {
+      console.error('DEBUG: Chart.js not loaded on window.');
+      return;
+  }
+
   try {
     const canvas = document.getElementById('chart');
-    if (!canvas) return;
+    if (!canvas) {
+        console.error('DEBUG: Chart canvas element not found.');
+        return;
+    }
     const ctx = canvas.getContext('2d');
     
     // Prepare data (category totals)
@@ -20,6 +29,8 @@ export function initChart(data) {
         categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(t.amountEur);
       }
     });
+
+    console.log('DEBUG: Chart data prepared:', categoryTotals);
 
     if (chart) chart.destroy();
     chart = new ChartInstance(ctx, {
@@ -34,7 +45,8 @@ export function initChart(data) {
       },
       options: { responsive: true }
     });
+    console.log('DEBUG: Chart rendered.');
   } catch (err) {
-    console.error('Failed to initialize chart:', err);
+    console.error('DEBUG: Failed to initialize chart:', err);
   }
 }

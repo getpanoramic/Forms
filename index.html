@@ -114,18 +114,33 @@ import { getExchangeRate } from './js/api.js';
 import { saveTransactions, getAllTransactions } from './js/db.js';
 import { initChart } from './js/charts.js';
 
+console.log('DEBUG: Module script starting...');
+
 let rawData = [];
 let hideCurve = true;
 let RATE = 1.17;
 
-(async () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log('DEBUG: DOM fully loaded.');
+  
   setLoading(true);
   [RATE, rawData] = await Promise.all([getExchangeRate(), getAllTransactions()]);
   if (rawData.length > 0) renderTable(rawData);
   setLoading(false);
-})();
 
-// Global variables needed by the HTML handlers
+  const csvInput = document.getElementById('csvFileInput');
+  if (csvInput) {
+    console.log('DEBUG: Binding CSV input listener.');
+    csvInput.onchange = (e) => {
+        console.log('DEBUG: File input changed.');
+        parseAndRender(e.target.files[0]);
+    };
+  } else {
+    console.error('DEBUG: csvFileInput element not found!');
+  }
+});
+
+// Global variables and functions needed by the HTML handlers
 window.CATEGORIES = CATEGORIES;
 window.RATE = RATE;
 window.guessCategory = guessCategory;
@@ -138,14 +153,7 @@ window.handleTableSubmit = handleTableSubmit;
 window.renderTable = renderTable;
 window.showToast = showToast;
 window.setLoading = setLoading;
-window.parseAndRender = parseAndRender; // Expose for share listener
-const mCat = document.getElementById('mCategory');
-const fCat = document.getElementById('filterCat');
-Object.entries(CATEGORIES).forEach(([name, emoji]) => {
-  const opt = `<option value="${name}">${emoji} ${name}</option>`;
-  mCat.insertAdjacentHTML('beforeend', opt);
-  fCat.insertAdjacentHTML('beforeend', opt);
-});
+window.parseAndRender = parseAndRender;
 
 function toggleSection(id) { document.getElementById(id).classList.toggle('hidden-section'); }
 

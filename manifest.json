@@ -1,9 +1,10 @@
 {
-  "name": "Curve Finance",
+  "name": "Curve Finance Dashboard",
   "short_name": "Curve",
   "start_url": "/Forms/",
   "scope": "/Forms/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "minimal-ui"],
   "background_color": "#f3f4f6",
   "theme_color": "#6366f1",
   "icons": [
@@ -12,6 +13,13 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Importar CSV",
+      "url": "/Forms/",
+      "description": "Abrir para importar CSV"
     }
   ],
   "share_target": {

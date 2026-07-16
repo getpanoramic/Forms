@@ -23,11 +23,12 @@ export function initChart(data) {
     
     // Prepare data (category totals)
     const categoryTotals = {};
+    console.log('DEBUG: Processing data for chart, first 5 rows:', data.slice(0, 5));
     data.forEach(t => {
-      if (t.amountEur < 0) {
-        const cat = t.csvCategory || 'Diversos';
-        categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(t.amountEur);
-      }
+      // Allow positive amounts if they should be tracked, or check if amountEur is always positive.
+      // If all values are positive, we should plot everything.
+      const cat = t.csvCategory || 'Diversos';
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(t.amountEur);
     });
 
     console.log('DEBUG: Chart data prepared:', categoryTotals);

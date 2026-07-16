@@ -203,11 +203,13 @@ function handleTableSubmit(btn, date, merchant, amount, selectId) {
 }
 
 async function parseAndRender(file) {
+  console.log('DEBUG: parseAndRender started for:', file.name);
   Papa.parse(file, {
     header: true, skipEmptyLines: true,
     complete: async (r) => {
+      console.log('DEBUG: Papa.parse complete. Data length:', r.data.length);
       const parsedData = r.data.map(row => ({
-        id: crypto.randomUUID(), // Add unique ID for IndexedDB
+        id: crypto.randomUUID(),
         date: row['Date (YYYY-MM-DD as UTC)'],
         merchant: row['Merchant'] || '',
         amountEur: parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0,
@@ -217,14 +219,18 @@ async function parseAndRender(file) {
         cardName: row['Card Name'],
         csvCategory: row['Category']
       }));
+      console.log('DEBUG: Data mapped. Saving to DB...');
       rawData = parsedData;
       await saveTransactions(rawData);
+      console.log('DEBUG: Data saved to DB. Calling renderTable...');
       renderTable(rawData);
-    }
+    },
+    error: (err) => console.error('DEBUG: Papa.parse error:', err)
   });
 }
 
 function renderTable(data) {
+  console.log('DEBUG: renderTable called with length:', data.length);
   const body = document.getElementById('transactionsBody');
   body.innerHTML = '';
   const start = document.getElementById('filterStart').value;
@@ -236,6 +242,7 @@ function renderTable(data) {
     if (end && row.date > end) return false;
     return true;
   });
+  console.log('DEBUG: Filtered data length:', filtered.length);
 
   let tDesp = 0, tEntr = 0;
   filtered.forEach((row, i) => {

@@ -24,6 +24,9 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
     <p class="text-xs text-gray-400 font-bold uppercase tracking-widest">Gestão de Transações Inteligente</p>
   </div>
   <div class="flex gap-2">
+    <button id="loginBtn" class="bg-blue-600 text-white font-black px-6 py-3 rounded-lg hover:bg-blue-700 uppercase text-xs tracking-widest transition-all">
+      Login Google
+    </button>
     <button onclick="toggleSection('toolsArea')" class="bg-indigo-100 text-indigo-700 font-black px-6 py-3 rounded-lg hover:bg-indigo-200 uppercase text-xs tracking-widest transition-all">
       🛠️ Configurações & Filtros
     </button>
@@ -119,6 +122,7 @@ import { CATEGORIES } from './js/config.js';
 import { guessCategory } from './js/dataProcessor.js';
 import { showToast, setLoading } from './js/uiUtils.js';
 import { getExchangeRate } from './js/api.js';
+import { supabase } from './js/supabase.js';
 import { saveTransactions, getAllTransactions } from './js/db.js';
 import { initCharts } from './js/charts.js';
 
@@ -148,8 +152,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.sortTable = sortTable;
   window.initCharts = initCharts;
 
+// In DOMContentLoaded, fetch from Supabase
   setLoading(true);
-  [RATE, rawData] = await Promise.all([getExchangeRate(), getAllTransactions()]);
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (session) {
+    document.getElementById('loginBtn').textContent = 'Logout';
+    document.getElementById('loginBtn').onclick = () => supabase.auth.signOut();
+    rawData = await fetchUserTransactions();
+  } else {
+    // Fallback to local DB if not logged in
+    rawData = await getAllTransactions();
+  }
+  
   if (rawData.length > 0) renderTable(rawData);
   setLoading(false);
 
@@ -164,6 +179,51 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function toggleSection(id) { document.getElementById(id).classList.toggle('hidden-section'); }
+
+// --- Auth Handling ---
+async function handleLogin() {
+  const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+  if (error) showToast(error.message, 'error');
+}
+
+async function migrateDataToSupabase(user) {
+  setLoading(true);
+  const localData = await getAllTransactions();
+  if (localData.length === 0) {
+    setLoading(false);
+    return;
+  }
+
+  const transactionsToUpload = localData.map(t => ({
+    user_id: user.id,
+    date: t.date,
+    merchant: t.merchant,
+    amount: t.amountEur || 0,
+    category: t.csvCategory || 'Diversos',
+    submitted: false
+  }));
+
+  const { error } = await supabase.from('transactions').insert(transactionsToUpload);
+  if (error) {
+    showToast('Erro na migração de dados', 'error');
+    console.error(error);
+  } else {
+    showToast('Dados sincronizados com a cloud!', 'success');
+  }
+  setLoading(false);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('loginBtn').onclick = handleLogin;
+});
+
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN') {
+    document.getElementById('loginBtn').textContent = 'Logout';
+    document.getElementById('loginBtn').onclick = () => supabase.auth.signOut();
+    migrateDataToSupabase(session.user);
+  }
+});
 
 function toggleCurve() {
   hideCurve = !hideCurve;
@@ -198,6 +258,21 @@ async function submitRow(btn, date, merchant, amount, category) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formData.toString() 
     });
+    
+    // NEW: Mark as submitted in Supabase
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from('transactions')
+        .update({ submitted: true })
+        .eq('user_id', user.id)
+        .eq('merchant', merchant)
+        .eq('date', date);
+      
+      // Refresh data and UI
+      rawData = await fetchUserTransactions();
+      renderTable(rawData);
+    }
+    
     setLoading(false);
     btn.innerText = 'OK ✅';
     showToast('Transação enviada com sucesso!', 'success');
@@ -304,8 +379,11 @@ function renderTable(data) {
           </select>
         </td>
         <td class="p-4 text-center">
-          <button onclick="handleTableSubmit(this, '${row.date}', '${merchantSafe}', ${finalEur.toFixed(2)}, '${catId}')"
-            class="bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow">Submeter</button>
+          ${row.submitted ? 
+            '<span class="text-emerald-600 font-black text-xs">Submetido ✅</span>' : 
+            `<button onclick="handleTableSubmit(this, '${row.date}', '${merchantSafe}', ${finalEur.toFixed(2)}, '${catId}')"
+              class="bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow">Submeter</button>`
+          }
         </td>
       </tr>
     `);

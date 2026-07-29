@@ -295,7 +295,7 @@ async function submitRow(btn, date, merchant, amount, category) {
 
       if (fetchError) {
         console.error('DEBUG: Fetch error:', fetchError);
-      if (existingRows && existingRows.length > 0) {
+      } else if (existingRows && existingRows.length > 0) {
         console.log('DEBUG: Found rows to update:', existingRows.length);
         const { error: updateError } = await supabase.from('transactions')
           .update({ submitted: true })

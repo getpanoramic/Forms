@@ -346,6 +346,7 @@ let sortConfig = { key: 'date', direction: 'desc' };
 
 function renderTable(data) {
   console.log('DEBUG: renderTable called with length:', data.length);
+  if (data.length > 0) console.log('DEBUG: First row data:', data[0]);
   const body = document.getElementById('transactionsBody');
   body.innerHTML = '';
   const start = document.getElementById('filterStart').value;

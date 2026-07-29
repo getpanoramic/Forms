@@ -305,20 +305,20 @@ async function submitRow(btn, date, merchant, amount, category) {
             console.error('DEBUG: Update error:', updateError);
         } else {
             console.log('DEBUG: Update successful!');
-            // Small delay to ensure DB consistency before refetch
-            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // 1. Explicitly update the in-memory array for immediate UI feedback
+            const rowIndex = rawData.findIndex(r => r.id === existingRows[0].id);
+            if (rowIndex !== -1) {
+                rawData[rowIndex].submitted = true;
+            } else {
+                // Fallback: if ID mapping failed, just refetch everything
+                rawData = await fetchUserTransactions();
+            }
+            
+            // 2. Force UI to show all items to ensure user sees the updated record
+            document.getElementById('filterStatus').value = 'All';
+            renderTable(rawData);
         }
-      } else {
-        console.warn('DEBUG: No matching row found to update for:', merchant, date);
-      }
-
-      // Refresh data directly from Supabase
-      rawData = await fetchUserTransactions();
-
-      // Force UI to show all items to ensure user sees the updated record
-      document.getElementById('filterStatus').value = 'All';
-      renderTable(rawData);
-      }
     
     setLoading(false);
     btn.innerText = 'OK ✅';

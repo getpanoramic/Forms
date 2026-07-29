@@ -283,19 +283,31 @@ async function submitRow(btn, date, merchant, amount, category) {
     // NEW: Mark as submitted in Supabase
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      // Fetch the record first to get the unique ID, then update
-      const { data: existingRows } = await supabase
+      console.log('DEBUG: Attempting to update merchant:', merchant, 'date:', date);
+      
+      // Fetch the record first, but keep query simple
+      const { data: existingRows, error: fetchError } = await supabase
         .from('transactions')
-        .select('id')
+        .select('id, merchant')
         .eq('user_id', user.id)
-        .eq('merchant', merchant)
         .eq('date', date)
-        .limit(1);
+        .ilike('merchant', `%${merchant}%`); // Use ilike for better matching
 
-      if (existingRows && existingRows.length > 0) {
-        await supabase.from('transactions')
+      if (fetchError) {
+        console.error('DEBUG: Fetch error:', fetchError);
+      } else if (existingRows && existingRows.length > 0) {
+        console.log('DEBUG: Found rows to update:', existingRows.length);
+        const { error: updateError } = await supabase.from('transactions')
           .update({ submitted: true })
           .eq('id', existingRows[0].id);
+          
+        if (updateError) {
+            console.error('DEBUG: Update error:', updateError);
+        } else {
+            console.log('DEBUG: Update successful!');
+        }
+      } else {
+        console.warn('DEBUG: No matching row found to update for:', merchant, date);
       }
       
       // Refresh data directly from Supabase

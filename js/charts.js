@@ -1,6 +1,3 @@
-// Using the UMD bundle which includes all dependencies to avoid resolution errors
-import 'https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.js';
-
 let chartCat, chartTime;
 
 export function initCharts(data) {
@@ -18,11 +15,14 @@ export function initCharts(data) {
     const timelineData = {};
     
     data.forEach(t => {
-      const cat = t.csvCategory || 'Diversos';
-      categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(t.amountEur);
+      // Use unified mapping: 'csvCategory' (CSV) or 'category' (Supabase)
+      const cat = t.csvCategory || t.category || 'Diversos';
+      const amount = parseFloat(t.amountEur || t.amount) || 0;
+      
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(amount);
       
       const date = t.date;
-      timelineData[date] = (timelineData[date] || 0) + Math.abs(t.amountEur);
+      timelineData[date] = (timelineData[date] || 0) + Math.abs(amount);
     });
 
     // Render Category Chart

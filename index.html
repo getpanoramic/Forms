@@ -289,9 +289,8 @@ async function submitRow(btn, date, merchant, amount, category) {
         .eq('merchant', merchant)
         .eq('date', date);
       
-      // Refresh data and UI
+      // Refresh data directly from Supabase
       rawData = await fetchUserTransactions();
-      console.log('DEBUG: Post-submit data length:', rawData.length);
       renderTable(rawData);
     }
     

@@ -374,20 +374,22 @@ function renderTable(data) {
   let tDesp = 0, tEntr = 0;
   filtered.forEach((row, i) => {
     let valHtml = "";
-    let finalEur = parseFloat(row.amountEur) || 0;
-    const guessed = row.csvCategory || guessCategory(row);
+    // Unify mapping: Supabase uses 'amount', CSV parser uses 'amountEur'
+    const amount = parseFloat(row.amountEur || row.amount) || 0;
+    const category = row.csvCategory || row.category || 'Diversos';
+    
+    let finalEur = amount;
+    const guessed = category;
     
     if (row.fundingCurrency === 'CPT') {
       const pts = Math.abs(finalEur);
       const eur = pts * 0.01 * RATE;
-      if (typeof eur === 'undefined') console.error('DEBUG: eur is undefined for:', row);
       valHtml = `<div class="text-emerald-600 font-bold">${pts}pts</div><div class="text-[10px] text-gray-400">(${eur.toFixed(2)}€)</div>`;
       finalEur = eur;
     } else if (row.spendCurrency !== 'EUR' && row.spendCurrency !== '' && row.spendCurrency !== undefined) {
       valHtml = `<div class="${finalEur < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${Math.abs(finalEur).toFixed(2)}€</div>
         <div class="text-[10px] text-gray-400">(${Math.abs(parseFloat(row.spendAmount) || 0).toFixed(2)}${row.spendCurrency})</div>`;
     } else {
-      if (typeof finalEur === 'undefined') console.error('DEBUG: finalEur is undefined for:', row);
       valHtml = `<div class="${finalEur < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${Math.abs(finalEur).toFixed(2)}€</div>`;
     }
 

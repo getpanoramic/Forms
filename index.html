@@ -193,7 +193,12 @@ function toggleSection(id) { document.getElementById(id).classList.toggle('hidde
 
 // --- Auth Handling ---
 async function handleLogin() {
-  const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+  const { data, error } = await supabase.auth.signInWithOAuth({ 
+    provider: 'google',
+    options: {
+      redirectTo: 'https://getpanoramic.github.io/Forms/'
+    }
+  });
   if (error) showToast(error.message, 'error');
 }
 

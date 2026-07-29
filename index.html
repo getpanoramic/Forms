@@ -291,6 +291,7 @@ async function submitRow(btn, date, merchant, amount, category) {
       
       // Refresh data and UI
       rawData = await fetchUserTransactions();
+      console.log('DEBUG: Post-submit data length:', rawData.length);
       renderTable(rawData);
     }
     

@@ -123,6 +123,10 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
 </div>
 
 <script type="module">
+import { CATEGORIES } from './js/config.js';
+import { guessCategory } from './js/dataProcessor.js';
+import { showToast, setLoading } from './js/uiUtils.js';
+import { getExchangeRate } from './js/api.js';
 import { supabase, fetchUserTransactions, subscribeToTransactions } from './js/supabase.js';
 import { saveTransactions, getAllTransactions } from './js/db.js';
 import { initCharts } from './js/charts.js';

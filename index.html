@@ -61,6 +61,11 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
       <input type="date" id="filterStart" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold">
       <input type="date" id="filterEnd" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold">
       <select id="filterCat" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold"><option value="All">Todas as Categorias</option></select>
+      <select id="filterStatus" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold">
+        <option value="All">Todos os Status</option>
+        <option value="Pending">Pendentes</option>
+        <option value="Submitted">Submetidos</option>
+      </select>
     </div>
     <button id="toggleBtn" onclick="toggleCurve()" class="w-full bg-slate-500 text-white font-black py-3 rounded-lg uppercase text-xs tracking-widest">Mostrar Curve Cash</button>
   </div>
@@ -118,11 +123,7 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
 </div>
 
 <script type="module">
-import { CATEGORIES } from './js/config.js';
-import { guessCategory } from './js/dataProcessor.js';
-import { showToast, setLoading } from './js/uiUtils.js';
-import { getExchangeRate } from './js/api.js';
-import { supabase } from './js/supabase.js';
+import { supabase, fetchUserTransactions, subscribeToTransactions } from './js/supabase.js';
 import { saveTransactions, getAllTransactions } from './js/db.js';
 import { initCharts } from './js/charts.js';
 
@@ -160,6 +161,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('loginBtn').textContent = 'Logout';
     document.getElementById('loginBtn').onclick = () => supabase.auth.signOut();
     rawData = await fetchUserTransactions();
+    
+    // Subscribe to changes
+    subscribeToTransactions(async () => {
+        rawData = await fetchUserTransactions();
+        renderTable(rawData);
+    });
   } else {
     // Fallback to local DB if not logged in
     rawData = await getAllTransactions();
@@ -328,11 +335,14 @@ function renderTable(data) {
   body.innerHTML = '';
   const start = document.getElementById('filterStart').value;
   const end = document.getElementById('filterEnd').value;
+  const statusFilter = document.getElementById('filterStatus').value;
   
   let filtered = data.filter(row => {
     if (hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
     if (start && row.date < start) return false;
     if (end && row.date > end) return false;
+    if (statusFilter === 'Pending' && row.submitted) return false;
+    if (statusFilter === 'Submitted' && !row.submitted) return false;
     return true;
   });
 
@@ -393,7 +403,7 @@ function renderTable(data) {
   document.getElementById('statEntrada').textContent = `€ ${tEntr.toFixed(2)}`;
   document.getElementById('statSaldo').textContent = `€ ${(tEntr - tDesp).toFixed(2)}`;
   document.getElementById('statCount').textContent = filtered.length;
-  initChart(filtered);
+  initCharts(filtered);
 }
 
 function sortTable(key) {

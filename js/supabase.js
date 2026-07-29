@@ -1,9 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const SUPABASE_URL = 'https://rjfjojghtzkccbscwqby.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_Ru7-0nrBOOWTjHQdjla8Wg_b-GBNaY4';
+import { SUPABASE_URL, SUPABASE_KEY } from './supabase_config.js';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+export function subscribeToTransactions(onUpdate) {
+  return supabase
+    .channel('public:transactions')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, payload => {
+      onUpdate(payload);
+    })
+    .subscribe();
+}
 
 export async function fetchUserTransactions() {
   const { data: { user } } = await supabase.auth.getUser();

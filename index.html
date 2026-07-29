@@ -373,17 +373,17 @@ function renderTable(data) {
   let tDesp = 0, tEntr = 0;
   filtered.forEach((row, i) => {
     let valHtml = "";
-    let finalEur = row.amountEur;
+    let finalEur = parseFloat(row.amountEur) || 0;
     const guessed = row.csvCategory || guessCategory(row);
     
     if (row.fundingCurrency === 'CPT') {
-      const pts = Math.abs(row.amountEur);
+      const pts = Math.abs(finalEur);
       const eur = pts * 0.01 * RATE;
       valHtml = `<div class="text-emerald-600 font-bold">${pts}pts</div><div class="text-[10px] text-gray-400">(${eur.toFixed(2)}€)</div>`;
       finalEur = eur;
-    } else if (row.spendCurrency !== 'EUR' && row.spendCurrency !== '') {
+    } else if (row.spendCurrency !== 'EUR' && row.spendCurrency !== '' && row.spendCurrency !== undefined) {
       valHtml = `<div class="${finalEur < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${Math.abs(finalEur).toFixed(2)}€</div>
-        <div class="text-[10px] text-gray-400">(${Math.abs(row.spendAmount).toFixed(2)}${row.spendCurrency})</div>`;
+        <div class="text-[10px] text-gray-400">(${Math.abs(parseFloat(row.spendAmount) || 0).toFixed(2)}${row.spendCurrency})</div>`;
     } else {
       valHtml = `<div class="${finalEur < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${Math.abs(finalEur).toFixed(2)}€</div>`;
     }

@@ -295,28 +295,30 @@ async function submitRow(btn, date, merchant, amount, category) {
 
       if (fetchError) {
         console.error('DEBUG: Fetch error:', fetchError);
-      } else if (existingRows && existingRows.length > 0) {
+      if (existingRows && existingRows.length > 0) {
         console.log('DEBUG: Found rows to update:', existingRows.length);
         const { error: updateError } = await supabase.from('transactions')
           .update({ submitted: true })
           .eq('id', existingRows[0].id);
-          
+
         if (updateError) {
             console.error('DEBUG: Update error:', updateError);
         } else {
             console.log('DEBUG: Update successful!');
+            // Small delay to ensure DB consistency before refetch
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
       } else {
         console.warn('DEBUG: No matching row found to update for:', merchant, date);
       }
-      
+
       // Refresh data directly from Supabase
       rawData = await fetchUserTransactions();
-      
+
       // Force UI to show all items to ensure user sees the updated record
       document.getElementById('filterStatus').value = 'All';
       renderTable(rawData);
-    }
+      }
     
     setLoading(false);
     btn.innerText = 'OK ✅';
@@ -380,8 +382,12 @@ function renderTable(data) {
     if (hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
     if (start && row.date < start) return false;
     if (end && row.date > end) return false;
-    if (statusFilter === 'Pending' && row.submitted) return false;
-    if (statusFilter === 'Submitted' && !row.submitted) return false;
+    
+    // Log for debugging
+    const isSubmitted = !!row.submitted;
+    if (statusFilter === 'Pending' && isSubmitted) return false;
+    if (statusFilter === 'Submitted' && !isSubmitted) return false;
+    
     return true;
   });
 

@@ -16,10 +16,12 @@ export async function fetchUserTransactions() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
   
+  // Explicitly select all columns to ensure 'submitted' is included
   const { data, error } = await supabase
     .from('transactions')
-    .select('*')
-    .eq('user_id', user.id);
+    .select('id, user_id, date, merchant, amount, category, submitted, created_at')
+    .eq('user_id', user.id)
+    .order('date', { ascending: false });
     
   if (error) {
     console.error('Error fetching transactions:', error);

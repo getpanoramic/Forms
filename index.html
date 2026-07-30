@@ -336,40 +336,60 @@ function handleTableSubmit(btn, date, merchant, amount, selectId, id) {
   submitRow(btn, date, merchant, amount, category, id);
 }
 
+// Deterministic ID generator to prevent duplicates
+function generateStableId(payload) {
+  const merchant = String(payload.merchant || '').trim().toLowerCase();
+  const amount = Number(payload.amount || 0).toFixed(2);
+  const date = String(payload.date || '').trim();
+  const userId = String(payload.user_id || '').trim();
+  const valueString = `${userId}:${date}:${merchant}:${amount}`;
+  
+  // Simple hash function to simulate UUIDv5 behavior since we can't easily import external libs in this environment
+  let hash = 0;
+  for (let i = 0; i < valueString.length; i++) {
+    hash = ((hash << 5) - hash) + valueString.charCodeAt(i);
+    hash |= 0;
+  }
+  return `stable-${hash}`;
+}
+
 async function parseAndRender(file) {
   console.log('DEBUG: parseAndRender started for:', file.name);
   Papa.parse(file, {
     header: true, skipEmptyLines: true,
     complete: async (r) => {
       console.log('DEBUG: Papa.parse complete. Data length:', r.data.length);
-      const parsedData = r.data.map(row => ({
-        date: row['Date (YYYY-MM-DD as UTC)'],
-        merchant: row['Merchant'] || '',
-        amountEur: parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0,
-        fundingCurrency: row['Txn Currency (Funding Card)'],
-        spendAmount: parseFloat(row['Txn Amount (Foreign Spend)']?.toString().replace(',', '.')) || 0,
-        spendCurrency: row['Txn Currency (Foreign Spend)'],
-        cardName: row['Card Name'],
-        csvCategory: row['Category']
-      }));
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user ? user.id : 'anonymous';
+
+      const parsedData = r.data.map(row => {
+        const amount = parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0;
+        const merchant = row['Merchant'] || '';
+        const date = row['Date (YYYY-MM-DD as UTC)'];
+        
+        const payload = {
+            user_id: userId,
+            date: date,
+            merchant: merchant,
+            amount: amount
+        };
+        
+        return {
+            id: generateStableId(payload),
+            user_id: userId,
+            date: date,
+            merchant: merchant,
+            amount: amount,
+            category: row['Category'] || 'Diversos',
+            submitted: false
+        };
+      });
       
-// Deduplicate locally and preserve 'submitted' status from database
-      const existingData = await fetchUserTransactions();
-      const existingMap = new Map(existingData.map(t => [`${t.date}_${t.merchant}_${t.amount}`, t.submitted]));
-
-      const uniqueData = Array.from(new Map(parsedData.map(item => {
-        const signature = `${item.date}_${item.merchant}_${item.amountEur}`;
-        return [signature, { 
-            ...item, 
-            id: crypto.randomUUID(), // Local ID is fine, but signature is key
-            submitted: existingMap.get(signature) || false 
-        }];
-      })).values());
-
-      console.log('DEBUG: Data mapped, preserved submitted status, and deduplicated. Saving to DB...');
-      rawData = uniqueData;
+      console.log('DEBUG: Data mapped with stable IDs. Saving to DB...');
+      rawData = parsedData;
       await saveTransactions(rawData);
       console.log('DEBUG: Data saved to DB. Calling renderTable...');
+      rawData = await fetchUserTransactions();
       renderTable(rawData);
     },
     error: (err) => console.error('DEBUG: Papa.parse error:', err)

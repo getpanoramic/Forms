@@ -353,12 +353,20 @@ async function parseAndRender(file) {
         csvCategory: row['Category']
       }));
       
-      // Deduplicate locally: create a unique key for each transaction
-      const uniqueData = Array.from(new Map(parsedData.map(item => 
-        [`${item.date}_${item.merchant}_${item.amountEur}`, { ...item, id: crypto.randomUUID(), submitted: false }]
-      )).values());
+// Deduplicate locally and preserve 'submitted' status from database
+      const existingData = await fetchUserTransactions();
+      const existingMap = new Map(existingData.map(t => [`${t.date}_${t.merchant}_${t.amount}`, t.submitted]));
 
-      console.log('DEBUG: Data mapped and deduplicated. Saving to DB...');
+      const uniqueData = Array.from(new Map(parsedData.map(item => {
+        const signature = `${item.date}_${item.merchant}_${item.amountEur}`;
+        return [signature, { 
+            ...item, 
+            id: crypto.randomUUID(), // Local ID is fine, but signature is key
+            submitted: existingMap.get(signature) || false 
+        }];
+      })).values());
+
+      console.log('DEBUG: Data mapped, preserved submitted status, and deduplicated. Saving to DB...');
       rawData = uniqueData;
       await saveTransactions(rawData);
       console.log('DEBUG: Data saved to DB. Calling renderTable...');

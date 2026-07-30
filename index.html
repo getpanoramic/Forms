@@ -104,10 +104,20 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
       <span class="text-[10px] font-black uppercase text-gray-400 self-center">Filtros Rápidos:</span>
   </div>
   <div class="bg-white card overflow-hidden md:col-span-2">
+    <div class="p-4 border-b flex gap-2 items-center">
+        <select id="bulkAction" class="p-2 border rounded-lg font-bold text-xs">
+            <option value="">Ações em Massa</option>
+            <option value="submit">Submeter Selecionados</option>
+            <option value="markSubmitted">Marcar como Submetidos</option>
+            <option value="changeCategory">Alterar Categoria</option>
+        </select>
+        <button onclick="handleBulkAction()" class="bg-slate-800 text-white text-xs font-black px-4 py-2 rounded-lg">Aplicar</button>
+    </div>
     <div class="scrollable-table">
       <table class="w-full text-left">
         <thead class="bg-gray-50 sticky top-0 border-b z-10">
           <tr>
+            <th class="p-4"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
             <th class="p-4 text-[10px] font-black text-gray-400 uppercase cursor-pointer" onclick="sortTable('date')">Data ↕️</th>
             <th class="p-4 text-[10px] font-black text-gray-400 uppercase cursor-pointer" onclick="sortTable('merchant')">Merchant ↕️</th>
             <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Valor</th>
@@ -157,6 +167,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.parseAndRender = parseAndRender;
   window.sortTable = sortTable;
   window.initCharts = initCharts;
+  window.toggleSelectAll = toggleSelectAll;
+  window.handleBulkAction = handleBulkAction;
 
 // In DOMContentLoaded, fetch from Supabase
   setLoading(true);
@@ -263,6 +275,38 @@ function toggleCurve() {
   hideCurve = !hideCurve;
   document.getElementById('toggleBtn').textContent = hideCurve ? "Mostrar Curve Cash" : "Ocultar Curve Cash";
   renderTable(rawData);
+}
+
+// --- Bulk Actions ---
+function toggleSelectAll(selectAllCheckbox) {
+    const checkboxes = document.querySelectorAll('.row-checkbox');
+    checkboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+}
+
+async function handleBulkAction() {
+    const action = document.getElementById('bulkAction').value;
+    const selectedIds = Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.dataset.id);
+    
+    if (selectedIds.length === 0) {
+        showToast('Selecione pelo menos uma transação!', 'warning');
+        return;
+    }
+
+    if (action === 'submit') {
+        showToast('Submissão em massa não implementada ainda.', 'info');
+    } else if (action === 'markSubmitted') {
+        setLoading(true);
+        const { error } = await supabase.from('transactions')
+            .update({ submitted: true })
+            .in('id', selectedIds);
+            
+        if (error) showToast('Erro ao marcar como submetido', 'error');
+        else showToast('Transações marcadas como submetidas!', 'success');
+        
+        rawData = await fetchUserTransactions();
+        renderTable(rawData);
+        setLoading(false);
+    }
 }
 
 // Logic to send data to Google Forms
@@ -467,6 +511,7 @@ function renderTable(data) {
 
     body.insertAdjacentHTML('beforeend', `
       <tr class="hover:bg-gray-50">
+        <td class="p-4"><input type="checkbox" class="row-checkbox" data-id="${row.id}"></td>
         <td class="p-4 text-xs font-bold text-gray-400">${row.date}</td>
         <td class="p-4"><div class="text-sm font-bold text-gray-800">${row.merchant}</div><div class="text-[9px] text-gray-400 uppercase font-black">${row.cardName || 'Curve'}</div></td>
         <td class="p-4 text-right leading-tight">${valHtml}</td>

@@ -184,6 +184,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (rawData.length > 0) renderTable(rawData);
   setLoading(false);
 
+  const loginBtn = document.getElementById('loginBtn');
+  if (loginBtn) {
+    loginBtn.onclick = handleLogin;
+    console.log('DEBUG: Login button bound.');
+  }
+
+  // PWA: Service Worker Registration - TEMPORARILY DISABLED
+  /*
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(console.error);
+  }
+  */
+
   const csvInput = document.getElementById('csvFileInput');
   if (csvInput) {
     console.log('DEBUG: Binding CSV input listener.');
@@ -319,6 +332,10 @@ async function submitRow(btn, date, merchant, amount, category) {
             document.getElementById('filterStatus').value = 'All';
             renderTable(rawData);
         }
+      } else {
+        console.warn('DEBUG: No matching row found to update for:', merchant, date);
+      }
+    }
     
     setLoading(false);
     btn.innerText = 'OK ✅';

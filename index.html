@@ -456,7 +456,7 @@ async function parseAndRender(file) {
         // Use AI to guess category IF checkbox is checked
         let category = row['Category'] || 'Diversos';
         if (document.getElementById('autoCategorize').checked) {
-            category = await guessCategory(merchant);
+            category = await guessCategory(merchant, rawData);
         }
         
         const payload = {
@@ -530,8 +530,6 @@ function renderTable(data) {
   let tDesp = 0, tEntr = 0;
   filtered.forEach((row, i) => {
     console.log('DEBUG: Row status:', row.submitted, 'for merchant:', row.merchant);
-    
-    const catId = `cat_${i}`;
     let valHtml = "";
     // Unify mapping: Supabase uses 'amount', CSV parser uses 'amountEur'
     const amount = parseFloat(row.amountEur || row.amount) || 0;
@@ -554,6 +552,9 @@ function renderTable(data) {
 
     if (finalEur < 0) tDesp += Math.abs(finalEur); else tEntr += finalEur;
     
+    const catId = `cat_${i}`;
+    const merchantSafe = row.merchant.replace(/'/g, "").replace(/"/g, "");
+
     body.insertAdjacentHTML('beforeend', `
       <tr class="hover:bg-gray-50">
         <td class="p-4"><input type="checkbox" class="row-checkbox" data-id="${row.id}"></td>
@@ -561,15 +562,14 @@ function renderTable(data) {
         <td class="p-4"><div class="text-sm font-bold text-gray-800">${row.merchant}</div><div class="text-[9px] text-gray-400 uppercase font-black">${row.cardName || 'Curve'}</div></td>
         <td class="p-4 text-right leading-tight">${valHtml}</td>
         <td class="p-4">
-          <select id="${catId}" onchange="updateCategory('${row.id}', this.value)" class="text-xs p-1.5 border rounded-lg bg-white font-bold w-full">
-            <option value="auto_ai">🤖 Auto-Atribuir (AI)</option>
+          <select onchange="updateCategory('${row.id}', this.value)" class="text-xs p-1.5 border rounded-lg bg-white font-bold w-full">
             ${Object.entries(CATEGORIES).map(([name, emoji]) => `<option value="${name}" ${name === guessed ? 'selected' : ''}>${emoji} ${name}</option>`).join('')}
           </select>
         </td>
         <td class="p-4 text-center">
           ${row.submitted ? 
             '<span class="text-emerald-600 font-black text-xs">Submetido ✅</span>' : 
-            `<button onclick="handleTableSubmit(this, '${row.date}', '${row.merchant.replace(/'/g, "").replace(/"/g, "")}', ${finalEur.toFixed(2)}, 'cat_${i}', '${row.id}')"
+            `<button onclick="handleTableSubmit(this, '${row.date}', '${merchantSafe}', ${finalEur.toFixed(2)}, '${catId}', '${row.id}')"
               class="bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow">Submeter</button>`
           }
         </td>

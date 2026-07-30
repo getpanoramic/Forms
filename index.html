@@ -298,39 +298,42 @@ async function submitRow(btn, date, merchant, amount, category) {
     if (user) {
       console.log('DEBUG: Attempting to update merchant:', merchant, 'date:', date);
       
-      // Fetch the record first, but keep query simple
-      const { data: existingRows, error: fetchError } = await supabase
+      // Fetch ALL matching rows, not just one, to clean up potential duplicates
+      const { data: duplicateRows, error: fetchError } = await supabase
         .from('transactions')
-        .select('id, merchant')
+        .select('id')
         .eq('user_id', user.id)
         .eq('date', date)
-        .ilike('merchant', `%${merchant}%`); // Use ilike for better matching
+        .ilike('merchant', merchant)
+        .eq('amount', amount);
 
       if (fetchError) {
         console.error('DEBUG: Fetch error:', fetchError);
-      } else if (existingRows && existingRows.length > 0) {
-        console.log('DEBUG: Found rows to update:', existingRows.length);
-        const { error: updateError } = await supabase.from('transactions')
-          .update({ submitted: true })
-          .eq('id', existingRows[0].id);
-
-        if (updateError) {
-            console.error('DEBUG: Update error:', updateError);
-        } else {
-            console.log('DEBUG: Update successful!');
-            await new Promise(resolve => setTimeout(resolve, 800));
-        }
+      } else if (duplicateRows && duplicateRows.length > 0) {
+        console.log('DEBUG: Found', duplicateRows.length, 'rows to consolidate.');
+        
+        // 1. Delete all duplicates
+        const idsToDelete = duplicateRows.map(r => r.id);
+        await supabase.from('transactions').delete().in('id', idsToDelete);
+        
+        // 2. Insert one clean, submitted record
+        await supabase.from('transactions').insert({
+            user_id: user.id,
+            date: date,
+            merchant: merchant,
+            amount: amount,
+            category: category,
+            submitted: true
+        });
+        
+        console.log('DEBUG: Cleanup and submit successful!');
       } else {
-        console.warn('DEBUG: No matching row found to update for:', merchant, date);
+        console.warn('DEBUG: No matching row found to update for:', merchant, date, amount);
       }
       
       // Refresh data directly from Supabase
       rawData = await fetchUserTransactions();
       
-      // VERIFICATION
-      const updatedRow = rawData.find(r => r.id === existingRows[0].id);
-      console.log('DEBUG: Verification - Row in DB after refresh:', updatedRow);
-
       // Force UI to show all items to ensure user sees the updated record
       document.getElementById('filterStatus').value = 'All';
       renderTable(rawData);

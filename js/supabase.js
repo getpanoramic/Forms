@@ -12,20 +12,26 @@ export function subscribeToTransactions(onUpdate) {
     .subscribe();
 }
 
-export async function fetchUserTransactions() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-  
-  // Explicitly select all columns to ensure 'submitted' is included
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('id, user_id, date, merchant, amount, category, submitted, created_at')
-    .eq('user_id', user.id)
-    .order('date', { ascending: false });
+export async function fetchUserTransactions(retries = 3, backoff = 1000) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
     
-  if (error) {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id, user_id, date, merchant, amount, category, submitted, created_at')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false });
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
     console.error('Error fetching transactions:', error);
+    if (retries > 0) {
+      console.log(`Retrying fetch... (${retries} attempts left)`);
+      await new Promise(resolve => setTimeout(resolve, backoff));
+      return fetchUserTransactions(retries - 1, backoff * 2);
+    }
     return [];
   }
-  return data;
 }

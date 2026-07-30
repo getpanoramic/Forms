@@ -295,40 +295,19 @@ async function submitRow(btn, date, merchant, amount, category) {
     
     // NEW: Mark as submitted in Supabase
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      console.log('DEBUG: Attempting to update merchant:', merchant, 'date:', date);
+    if (user && id) {
+      console.log('DEBUG: Updating transaction ID:', id);
       
-      // Fetch ALL matching rows, not just one, to clean up potential duplicates
-      const { data: duplicateRows, error: fetchError } = await supabase
-        .from('transactions')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('date', date)
-        .ilike('merchant', merchant)
-        .eq('amount', amount);
+      const { error: updateError } = await supabase.from('transactions')
+        .update({ submitted: true })
+        .eq('id', id);
 
-      if (fetchError) {
-        console.error('DEBUG: Fetch error:', fetchError);
-      } else if (duplicateRows && duplicateRows.length > 0) {
-        console.log('DEBUG: Found', duplicateRows.length, 'rows to consolidate.');
-        
-        // 1. Delete all duplicates
-        const idsToDelete = duplicateRows.map(r => r.id);
-        await supabase.from('transactions').delete().in('id', idsToDelete);
-        
-        // 2. Insert one clean, submitted record
-        await supabase.from('transactions').insert({
-            user_id: user.id,
-            date: date,
-            merchant: merchant,
-            amount: amount,
-            category: category,
-            submitted: true
-        });
-        
-        console.log('DEBUG: Cleanup and submit successful!');
+      if (updateError) {
+          console.error('DEBUG: Update error:', updateError);
       } else {
-        console.warn('DEBUG: No matching row found to update for:', merchant, date, amount);
+          console.log('DEBUG: Update successful!');
+          // Small delay to ensure DB consistency
+          await new Promise(resolve => setTimeout(resolve, 800));
       }
       
       // Refresh data directly from Supabase
@@ -352,9 +331,9 @@ function handleManualSubmit(e) {
   submitRow(e.target.querySelector('button'), document.getElementById('mDate').value, document.getElementById('mMerchant').value, document.getElementById('mAmount').value, document.getElementById('mCategory').value);
 }
 
-function handleTableSubmit(btn, date, merchant, amount, selectId) {
+function handleTableSubmit(btn, date, merchant, amount, selectId, id) {
   const category = document.getElementById(selectId).value;
-  submitRow(btn, date, merchant, amount, category);
+  submitRow(btn, date, merchant, amount, category, id);
 }
 
 async function parseAndRender(file) {
@@ -465,7 +444,7 @@ function renderTable(data) {
         <td class="p-4 text-center">
           ${row.submitted ? 
             '<span class="text-emerald-600 font-black text-xs">Submetido ✅</span>' : 
-            `<button onclick="handleTableSubmit(this, '${row.date}', '${merchantSafe}', ${finalEur.toFixed(2)}, '${catId}')"
+            `<button onclick="handleTableSubmit(this, '${row.date}', '${merchantSafe}', ${finalEur.toFixed(2)}, '${catId}', '${row.id}')"
               class="bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow">Submeter</button>`
           }
         </td>

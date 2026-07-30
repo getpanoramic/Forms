@@ -266,7 +266,7 @@ function toggleCurve() {
 }
 
 // Logic to send data to Google Forms
-async function submitRow(btn, date, merchant, amount, category) {
+async function submitRow(btn, date, merchant, amount, category, id) {
   if (!date || !merchant || !amount) {
     showToast('Preencha todos os campos!', 'error');
     return;

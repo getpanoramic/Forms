@@ -8,6 +8,7 @@ const candidateLabels = Object.keys(CATEGORIES);
 
 // Helper to get recent examples to "teach" the AI
 function getTrainingExamples(data) {
+    if (!data || !Array.isArray(data)) return '';
     // Take the last 20 labeled transactions to provide context
     return data
         .filter(t => t.category && t.category !== 'Diversos')

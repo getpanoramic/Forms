@@ -312,7 +312,8 @@ async function handleBulkAction() {
         for (const id of selectedIds) {
             const row = rawData.find(r => r.id === id);
             if (row) {
-                const newCat = await guessCategory(row.merchant);
+                // Pass rawData here to ensure context is available
+                const newCat = await guessCategory(row.merchant, rawData);
                 await supabase.from('transactions').update({ category: newCat }).eq('id', id);
             }
         }

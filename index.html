@@ -372,14 +372,18 @@ let sortConfig = { key: 'date', direction: 'desc' };
 
 function renderTable(data) {
   console.log('DEBUG: renderTable called with length:', data.length);
-  if (data.length > 0) console.log('DEBUG: First row data:', data[0]);
+  
+  // Deduplicate data by ID before rendering
+  const uniqueData = Array.from(new Map(data.map(item => [item.id, item])).values());
+  
+  if (uniqueData.length > 0) console.log('DEBUG: First row data:', uniqueData[0]);
   const body = document.getElementById('transactionsBody');
   body.innerHTML = '';
   const start = document.getElementById('filterStart').value;
   const end = document.getElementById('filterEnd').value;
   const statusFilter = document.getElementById('filterStatus').value;
   
-  let filtered = data.filter(row => {
+  let filtered = uniqueData.filter(row => {
     if (hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
     if (start && row.date < start) return false;
     if (end && row.date > end) return false;

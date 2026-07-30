@@ -286,7 +286,7 @@ async function submitRow(btn, date, merchant, amount, category) {
 
   try {
     setLoading(true);
-    await fetch(baseUrl, { 
+    const response = await fetch(baseUrl, { 
       method: 'POST', 
       mode: 'no-cors', 
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -304,6 +304,7 @@ async function submitRow(btn, date, merchant, amount, category) {
 
       if (updateError) {
           console.error('DEBUG: Update error:', updateError);
+          throw new Error('Supabase update failed: ' + updateError.message);
       } else {
           console.log('DEBUG: Update successful!');
           // Small delay to ensure DB consistency
@@ -320,8 +321,9 @@ async function submitRow(btn, date, merchant, amount, category) {
     btn.innerText = 'OK ✅';
     showToast('Transação enviada com sucesso!', 'success');
   } catch (err) {
+    console.error('DEBUG: Submission error:', err);
     setLoading(false);
-    showToast('Erro na submissão.', 'error');
+    showToast('Erro na submissão: ' + err.message, 'error');
     btn.disabled = false; btn.innerText = originalText;
   }
 }

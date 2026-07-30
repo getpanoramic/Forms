@@ -341,7 +341,7 @@ async function updateCategory(id, category) {
         const row = rawData.find(r => r.id === id);
         if (row) {
             setLoading(true);
-            finalCategory = await guessCategory(row.merchant);
+            finalCategory = await guessCategory(row.merchant, rawData);
             setLoading(false);
         }
     }
@@ -357,6 +357,7 @@ async function updateCategory(id, category) {
         showToast('Categoria atualizada!', 'success');
         rawData = await fetchUserTransactions();
         renderTable(rawData);
+        initCharts(rawData); // Ensure charts are re-initialized
     }
 }
 

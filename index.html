@@ -331,6 +331,7 @@ async function handleBulkAction() {
     
     rawData = await fetchUserTransactions();
     renderTable(rawData);
+    initCharts(rawData); // Ensure charts are re-initialized with the full raw data
     setLoading(false);
 }
 

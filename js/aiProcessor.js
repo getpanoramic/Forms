@@ -1,5 +1,8 @@
-import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
 import { CATEGORIES } from './config.js';
+
+// Configure environment to fetch models remotely
+env.allowLocalModels = false;
 
 let classifier = null;
 const candidateLabels = Object.keys(CATEGORIES);

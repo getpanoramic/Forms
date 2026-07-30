@@ -114,7 +114,7 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
             <option value="">Ações em Massa</option>
             <option value="submit">Submeter Selecionados</option>
             <option value="markSubmitted">Marcar como Submetidos</option>
-            <option value="changeCategory">Alterar Categoria</option>
+            <option value="aiCategorize">Categorizar com AI</option>
         </select>
         <button onclick="handleBulkAction()" class="bg-slate-800 text-white text-xs font-black px-4 py-2 rounded-lg">Aplicar</button>
     </div>
@@ -172,6 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.parseAndRender = parseAndRender;
   window.sortTable = sortTable;
   window.initCharts = initCharts;
+  window.updateCategory = updateCategory;
   window.toggleSelectAll = toggleSelectAll;
   window.handleBulkAction = handleBulkAction;
 
@@ -297,20 +298,54 @@ async function handleBulkAction() {
         return;
     }
 
+    setLoading(true);
     if (action === 'submit') {
         showToast('Submissão em massa não implementada ainda.', 'info');
     } else if (action === 'markSubmitted') {
-        setLoading(true);
         const { error } = await supabase.from('transactions')
             .update({ submitted: true })
             .in('id', selectedIds);
             
         if (error) showToast('Erro ao marcar como submetido', 'error');
         else showToast('Transações marcadas como submetidas!', 'success');
+    } else if (action === 'aiCategorize') {
+        for (const id of selectedIds) {
+            const row = rawData.find(r => r.id === id);
+            if (row) {
+                const newCat = await guessCategory(row.merchant);
+                await supabase.from('transactions').update({ category: newCat }).eq('id', id);
+            }
+        }
+        showToast('Transações categorizadas!', 'success');
+    }
+    
+    rawData = await fetchUserTransactions();
+    renderTable(rawData);
+    setLoading(false);
+}
+
+async function updateCategory(id, category) {
+    let finalCategory = category;
+    if (category === 'auto_ai') {
+        const row = rawData.find(r => r.id === id);
+        if (row) {
+            setLoading(true);
+            finalCategory = await guessCategory(row.merchant);
+            setLoading(false);
+        }
+    }
+
+    const { error } = await supabase.from('transactions')
+        .update({ category: finalCategory })
+        .eq('id', id);
         
+    if (error) {
+        showToast('Erro ao atualizar categoria', 'error');
+        console.error(error);
+    } else {
+        showToast('Categoria atualizada!', 'success');
         rawData = await fetchUserTransactions();
         renderTable(rawData);
-        setLoading(false);
     }
 }
 
@@ -418,8 +453,11 @@ async function parseAndRender(file) {
         const merchant = row['Merchant'] || '';
         const date = row['Date (YYYY-MM-DD as UTC)'];
         
-        // Use AI to guess category
-        const category = await guessCategory(merchant);
+        // Use AI to guess category IF checkbox is checked
+        let category = row['Category'] || 'Diversos';
+        if (document.getElementById('autoCategorize').checked) {
+            category = await guessCategory(merchant);
+        }
         
         const payload = {
             user_id: userId,
@@ -514,9 +552,6 @@ function renderTable(data) {
 
     if (finalEur < 0) tDesp += Math.abs(finalEur); else tEntr += finalEur;
     
-    const catId = `cat_${i}`;
-    const merchantSafe = row.merchant.replace(/'/g, "").replace(/"/g, "");
-
     body.insertAdjacentHTML('beforeend', `
       <tr class="hover:bg-gray-50">
         <td class="p-4"><input type="checkbox" class="row-checkbox" data-id="${row.id}"></td>
@@ -524,14 +559,15 @@ function renderTable(data) {
         <td class="p-4"><div class="text-sm font-bold text-gray-800">${row.merchant}</div><div class="text-[9px] text-gray-400 uppercase font-black">${row.cardName || 'Curve'}</div></td>
         <td class="p-4 text-right leading-tight">${valHtml}</td>
         <td class="p-4">
-          <select id="${catId}" class="text-xs p-1.5 border rounded-lg bg-white font-bold w-full">
+          <select id="${catId}" onchange="updateCategory('${row.id}', this.value)" class="text-xs p-1.5 border rounded-lg bg-white font-bold w-full">
+            <option value="auto_ai">🤖 Auto-Atribuir (AI)</option>
             ${Object.entries(CATEGORIES).map(([name, emoji]) => `<option value="${name}" ${name === guessed ? 'selected' : ''}>${emoji} ${name}</option>`).join('')}
           </select>
         </td>
         <td class="p-4 text-center">
           ${row.submitted ? 
             '<span class="text-emerald-600 font-black text-xs">Submetido ✅</span>' : 
-            `<button onclick="handleTableSubmit(this, '${row.date}', '${merchantSafe}', ${finalEur.toFixed(2)}, '${catId}', '${row.id}')"
+            `<button onclick="handleTableSubmit(this, '${row.date}', '${row.merchant.replace(/'/g, "").replace(/"/g, "")}', ${finalEur.toFixed(2)}, 'cat_${i}', '${row.id}')"
               class="bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow">Submeter</button>`
           }
         </td>

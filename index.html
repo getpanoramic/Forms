@@ -530,6 +530,8 @@ function renderTable(data) {
   let tDesp = 0, tEntr = 0;
   filtered.forEach((row, i) => {
     console.log('DEBUG: Row status:', row.submitted, 'for merchant:', row.merchant);
+    
+    const catId = `cat_${i}`;
     let valHtml = "";
     // Unify mapping: Supabase uses 'amount', CSV parser uses 'amountEur'
     const amount = parseFloat(row.amountEur || row.amount) || 0;

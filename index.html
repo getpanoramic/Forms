@@ -409,10 +409,13 @@ async function parseAndRender(file) {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user ? user.id : 'anonymous';
 
-      const parsedData = r.data.map(row => {
+      const parsedData = await Promise.all(r.data.map(async row => {
         const amount = parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0;
         const merchant = row['Merchant'] || '';
         const date = row['Date (YYYY-MM-DD as UTC)'];
+        
+        // Use AI to guess category
+        const category = await guessCategory(merchant);
         
         const payload = {
             user_id: userId,
@@ -427,10 +430,10 @@ async function parseAndRender(file) {
             date: date,
             merchant: merchant,
             amount: amount,
-            category: row['Category'] || 'Diversos',
+            category: category,
             submitted: false
         };
-      });
+      }));
       
       console.log('DEBUG: Data mapped with stable IDs. Saving to DB...');
       rawData = parsedData;

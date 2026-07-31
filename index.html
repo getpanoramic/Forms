@@ -521,8 +521,17 @@ async function parseAndRender(file) {
 
       // AI Categorization in chunks to avoid blocking/crash
       if (autoCategorize) {
-        setLoading(true, 'A categorizar com AI...');
+        setLoading(true, 'A categorizar com AI (0%)...');
         for (let i = 0; i < mappedRows.length; i++) {
+            // Update loading message every 5 rows to avoid spamming the DOM
+            if (i % 5 === 0) {
+                const percent = Math.round((i / mappedRows.length) * 100);
+                setLoading(true, `A categorizar com AI (${percent}%)...`);
+                console.log(`DEBUG: Categorizing row ${i}/${mappedRows.length}: ${mappedRows[i].merchant}`);
+                // Yield to the browser to allow UI updates
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+
             try {
                 // Wrap AI call in a timeout promise to prevent hanging
                 mappedRows[i].category = await Promise.race([
@@ -530,7 +539,7 @@ async function parseAndRender(file) {
                     new Promise((_, reject) => setTimeout(() => reject(new Error('AI Timeout')), 5000))
                 ]);
             } catch (err) {
-                console.warn(`AI failed for ${mappedRows[i].merchant}:`, err);
+                console.warn(`DEBUG: AI failed for ${mappedRows[i].merchant}:`, err);
                 mappedRows[i].category = 'Diversos';
             }
         }

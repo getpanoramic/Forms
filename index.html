@@ -521,41 +521,44 @@ async function parseAndRender(file) {
 
       // AI Categorization in chunks to avoid blocking/crash
       if (autoCategorize) {
-        setLoading(true, 'A categorizar com AI (0%)...');
-        const cache = new Map(); // Cache to store merchant -> category
+        setLoading(true, 'A preparar categorização AI...');
+        
+        // 1. Identify rows that need AI categorization (missing or "Diversos")
+        const rowsToCategorize = mappedRows.filter(r => !r.category || r.category === 'Diversos');
+        const uniqueMerchants = [...new Set(rowsToCategorize.map(r => r.merchant))];
+        const merchantMap = new Map();
 
-        for (let i = 0; i < mappedRows.length; i++) {
-            const merchant = mappedRows[i].merchant;
+        console.log(`DEBUG: Categorizing ${uniqueMerchants.length} unique merchants.`);
+
+        // 2. Categorize only unique merchants
+        for (let i = 0; i < uniqueMerchants.length; i++) {
+            const merchant = uniqueMerchants[i];
             
-            // Check cache first
-            if (cache.has(merchant)) {
-                mappedRows[i].category = cache.get(merchant);
-                continue; // Skip AI call
-            }
-
-            // Update loading message every 5 rows to avoid spamming the DOM
-            if (i % 5 === 0) {
-                const percent = Math.round((i / mappedRows.length) * 100);
-                setLoading(true, `A categorizar com AI (${percent}%)...`);
-                console.log(`DEBUG: Categorizing row ${i}/${mappedRows.length}: ${merchant}`);
-                // Yield to the browser to allow UI updates
+            // Update loading message
+            if (i % 2 === 0) { // Update UI frequently
+                const percent = Math.round((i / uniqueMerchants.length) * 100);
+                setLoading(true, `A categorizar ${uniqueMerchants.length} merchants (${percent}%)...`);
                 await new Promise(resolve => setTimeout(resolve, 10));
             }
 
             try {
-                // Wrap AI call in a timeout promise to prevent hanging
                 const category = await Promise.race([
                     guessCategory(merchant, []),
                     new Promise((_, reject) => setTimeout(() => reject(new Error('AI Timeout')), 5000))
                 ]);
-                mappedRows[i].category = category;
-                cache.set(merchant, category); // Save to cache
+                merchantMap.set(merchant, category);
             } catch (err) {
                 console.warn(`DEBUG: AI failed for ${merchant}:`, err);
-                mappedRows[i].category = 'Diversos';
-                cache.set(merchant, 'Diversos'); // Cache failure too
+                merchantMap.set(merchant, 'Diversos');
             }
         }
+
+        // 3. Apply categories only to those that needed it
+        mappedRows.forEach(row => {
+            if (!row.category || row.category === 'Diversos') {
+                row.category = merchantMap.get(row.merchant) || 'Diversos';
+            }
+        });
       }
       
       console.log('DEBUG: Saving to DB...');

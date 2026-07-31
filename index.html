@@ -522,25 +522,38 @@ async function parseAndRender(file) {
       // AI Categorization in chunks to avoid blocking/crash
       if (autoCategorize) {
         setLoading(true, 'A categorizar com AI (0%)...');
+        const cache = new Map(); // Cache to store merchant -> category
+
         for (let i = 0; i < mappedRows.length; i++) {
+            const merchant = mappedRows[i].merchant;
+            
+            // Check cache first
+            if (cache.has(merchant)) {
+                mappedRows[i].category = cache.get(merchant);
+                continue; // Skip AI call
+            }
+
             // Update loading message every 5 rows to avoid spamming the DOM
             if (i % 5 === 0) {
                 const percent = Math.round((i / mappedRows.length) * 100);
                 setLoading(true, `A categorizar com AI (${percent}%)...`);
-                console.log(`DEBUG: Categorizing row ${i}/${mappedRows.length}: ${mappedRows[i].merchant}`);
+                console.log(`DEBUG: Categorizing row ${i}/${mappedRows.length}: ${merchant}`);
                 // Yield to the browser to allow UI updates
                 await new Promise(resolve => setTimeout(resolve, 10));
             }
 
             try {
                 // Wrap AI call in a timeout promise to prevent hanging
-                mappedRows[i].category = await Promise.race([
-                    guessCategory(mappedRows[i].merchant, []),
+                const category = await Promise.race([
+                    guessCategory(merchant, []),
                     new Promise((_, reject) => setTimeout(() => reject(new Error('AI Timeout')), 5000))
                 ]);
+                mappedRows[i].category = category;
+                cache.set(merchant, category); // Save to cache
             } catch (err) {
-                console.warn(`DEBUG: AI failed for ${mappedRows[i].merchant}:`, err);
+                console.warn(`DEBUG: AI failed for ${merchant}:`, err);
                 mappedRows[i].category = 'Diversos';
+                cache.set(merchant, 'Diversos'); // Cache failure too
             }
         }
       }

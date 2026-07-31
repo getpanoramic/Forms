@@ -2,15 +2,17 @@ import { supabase } from './supabase.js';
 
 export async function saveTransactions(transactions) {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) {
+    console.log('DEBUG: No user, skipping save.');
+    return;
+  }
 
-  // Supabase upsert requires a unique constraint. 
-  // Since we don't have one on merchant/date/amount, we need to handle this differently.
-  // The best way for now, assuming user is logged in, is to delete all existing
-  // for this user and re-insert, OR just upsert if we had a unique constraint.
-  // Given the current architecture, we will delete all and re-insert for this user.
-  
-  await supabase.from('transactions').delete().eq('user_id', user.id);
+  console.log(`DEBUG: Deleting existing transactions for user: ${user.id}`);
+  const { error: deleteError } = await supabase.from('transactions').delete().eq('user_id', user.id);
+  if (deleteError) {
+      console.error('DEBUG: Error deleting:', deleteError);
+      throw deleteError;
+  }
   
   const transactionsToUpload = transactions.map(t => ({
     id: t.id,
@@ -20,10 +22,16 @@ export async function saveTransactions(transactions) {
     amount: t.amountEur || t.amount || 0,
     category: t.csvCategory || t.category || 'Diversos',
     submitted: !!t.submitted,
-    source: t.source || 'csv'
+    source: t.source || 'pdf' // Changed from csv to pdf to be more accurate if source is missing or PDF
   }));
   
-  await supabase.from('transactions').upsert(transactionsToUpload);
+  console.log(`DEBUG: Inserting ${transactionsToUpload.length} transactions.`);
+  const { error: insertError } = await supabase.from('transactions').upsert(transactionsToUpload);
+  if (insertError) {
+      console.error('DEBUG: Error upserting:', insertError);
+      throw insertError;
+  }
+  console.log('DEBUG: Successfully saved transactions.');
 }
 
 export async function getAllTransactions() {

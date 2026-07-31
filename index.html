@@ -630,17 +630,16 @@ let sortConfig = { key: 'date', direction: 'desc' };
 let currentPage = 1;
 const rowsPerPage = 20;
 
-function renderTable(data, page = 1) {
-  console.log('DEBUG: renderTable called. Page:', page, 'Data provided length:', data ? data.length : 'NULL');
-  console.log('DEBUG: window.rawData length:', window.rawData ? window.rawData.length : 'NULL');
+// Updated to not take data as argument, always use global
+function renderTable(page = 1) {
+  const data = window.rawData;
+  console.log('DEBUG: renderTable called. Page:', page, 'Global data length:', data ? data.length : 'NULL');
   
-  // Use the provided data, but if it's empty, try to fallback to global
-  const targetData = (data && data.length > 0) ? data : window.rawData;
   currentPage = page;
   
   // Deduplicate data by ID before rendering
   const map = new Map();
-  targetData.forEach(item => {
+  data.forEach(item => {
     map.set(item.id, item);
   });
   const uniqueData = Array.from(map.values());
@@ -735,9 +734,9 @@ function renderTable(data, page = 1) {
   // Render Pagination Controls
   const paginationControls = document.getElementById('paginationControls');
   paginationControls.innerHTML = `
-    <button ${currentPage === 1 ? 'disabled' : ''} onclick="renderTable(window.rawData, ${currentPage - 1})" class="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
+    <button ${currentPage === 1 ? 'disabled' : ''} onclick="renderTable(${currentPage - 1})" class="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
     <span class="text-sm font-bold">Página ${currentPage} de ${totalPages}</span>
-    <button ${currentPage === totalPages ? 'disabled' : ''} onclick="renderTable(window.rawData, ${currentPage + 1})" class="px-3 py-1 border rounded disabled:opacity-50">Próxima</button>
+    <button ${currentPage === totalPages ? 'disabled' : ''} onclick="renderTable(${currentPage + 1})" class="px-3 py-1 border rounded disabled:opacity-50">Próxima</button>
   `;
 
   document.getElementById('statDespesa').textContent = `€ ${tDesp.toFixed(2)}`;

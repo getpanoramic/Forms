@@ -631,12 +631,16 @@ let currentPage = 1;
 const rowsPerPage = 20;
 
 function renderTable(data, page = 1) {
+  console.log('DEBUG: renderTable called. Page:', page, 'Data provided length:', data ? data.length : 'NULL');
+  console.log('DEBUG: window.rawData length:', window.rawData ? window.rawData.length : 'NULL');
+  
+  // Use the provided data, but if it's empty, try to fallback to global
+  const targetData = (data && data.length > 0) ? data : window.rawData;
   currentPage = page;
-  console.log('DEBUG: renderTable called. Page:', currentPage);
   
   // Deduplicate data by ID before rendering
   const map = new Map();
-  data.forEach(item => {
+  targetData.forEach(item => {
     map.set(item.id, item);
   });
   const uniqueData = Array.from(map.values());
@@ -671,7 +675,7 @@ function renderTable(data, page = 1) {
   });
 
   // Pagination
-  const totalPages = Math.ceil(filtered.length / rowsPerPage);
+  const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
   const paginatedData = filtered.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
   console.log('DEBUG: Filtered data length:', filtered.length, 'Pages:', totalPages);

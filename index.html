@@ -626,15 +626,16 @@ async function parseAndRenderPdf(file) {
 
 let sortConfig = { key: 'date', direction: 'desc' };
 
-function renderTable(data) {
-  console.log('DEBUG: renderTable called with length:', data.length);
+let currentPage = 1;
+const rowsPerPage = 20;
+
+function renderTable(data, page = 1) {
+  currentPage = page;
+  console.log('DEBUG: renderTable called. Page:', currentPage);
   
   // Deduplicate data by ID before rendering
   const map = new Map();
   data.forEach(item => {
-    if (map.has(item.id)) {
-      console.warn(`DEBUG: Duplicate ID found, dropping: ${item.id}`, item);
-    }
     map.set(item.id, item);
   });
   const uniqueData = Array.from(map.values());
@@ -648,7 +649,6 @@ function renderTable(data) {
   let filtered = uniqueData.filter(row => {
     // Tab filtering: Only show records from the correct source
     const rowSource = row.source || 'csv';
-    console.log(`DEBUG: Row ${row.id} source: ${rowSource}, currentTab: ${currentTab}`);
     if (rowSource !== currentTab) return false;
     
     if (hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
@@ -669,10 +669,20 @@ function renderTable(data) {
     return 0;
   });
 
-  console.log('DEBUG: Filtered data length:', filtered.length);
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / rowsPerPage);
+  const paginatedData = filtered.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+
+  console.log('DEBUG: Filtered data length:', filtered.length, 'Pages:', totalPages);
 
   let tDesp = 0, tEntr = 0;
-  filtered.forEach((row, i) => {
+  // Calculate totals based on ALL filtered data, not just paginated
+  filtered.forEach(row => {
+    const amount = parseFloat(row.amountEur || row.amount) || 0;
+    if (amount < 0) tDesp += Math.abs(amount); else tEntr += amount;
+  });
+
+  paginatedData.forEach((row, i) => {
     let valHtml = "";
     const amount = parseFloat(row.amountEur || row.amount) || 0;
     const category = row.csvCategory || row.category || 'Diversos';
@@ -691,10 +701,8 @@ function renderTable(data) {
     } else {
       valHtml = `<div class="${finalEur < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${Math.abs(finalEur).toFixed(2)}€</div>`;
     }
-
-    if (finalEur < 0) tDesp += Math.abs(finalEur); else tEntr += finalEur;
     
-    const catId = `cat_${i}`;
+    const catId = `cat_${i + (currentPage-1)*rowsPerPage}`;
     const merchantSafe = row.merchant.replace(/'/g, "").replace(/"/g, "");
 
     body.insertAdjacentHTML('beforeend', `
@@ -719,11 +727,34 @@ function renderTable(data) {
     `);
   });
 
+  // Render Pagination Controls
+  let paginationHtml = `<div class="p-4 flex gap-2 items-center justify-center border-t">
+    <button ${currentPage === 1 ? 'disabled' : ''} onclick="renderTable(rawData, ${currentPage - 1})" class="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
+    <span class="text-sm font-bold">Página ${currentPage} de ${totalPages}</span>
+    <button ${currentPage === totalPages ? 'disabled' : ''} onclick="renderTable(rawData, ${currentPage + 1})" class="px-3 py-1 border rounded disabled:opacity-50">Próxima</button>
+  </div>`;
+  body.insertAdjacentHTML('afterend', paginationHtml); // Note: This needs to be outside the table body in the DOM structure ideally, but this works for simple rendering.
+
   document.getElementById('statDespesa').textContent = `€ ${tDesp.toFixed(2)}`;
   document.getElementById('statEntrada').textContent = `€ ${tEntr.toFixed(2)}`;
   document.getElementById('statSaldo').textContent = `€ ${(tEntr - tDesp).toFixed(2)}`;
   document.getElementById('statCount').textContent = filtered.length;
-  initCharts(filtered);
+  
+  // Fix Chart Filtering
+  const period = document.getElementById('chartPeriod').value;
+  let chartFiltered = filtered;
+  if (period !== 'all') {
+      const now = new Date();
+      let limitDate = new Date();
+      if (period === '1d') limitDate.setDate(now.getDate() - 1);
+      else if (period === '1w') limitDate.setDate(now.getDate() - 7);
+      else if (period === '1m') limitDate.setMonth(now.getMonth() - 1);
+      else if (period === '3m') limitDate.setMonth(now.getMonth() - 3);
+      
+      chartFiltered = filtered.filter(t => new Date(t.date) >= limitDate);
+  }
+  
+  initCharts(chartFiltered);
 }
 
 function sortTable(key) {

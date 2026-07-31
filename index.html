@@ -523,7 +523,16 @@ async function parseAndRender(file) {
       if (autoCategorize) {
         setLoading(true, 'A categorizar com AI...');
         for (let i = 0; i < mappedRows.length; i++) {
-            mappedRows[i].category = await guessCategory(mappedRows[i].merchant, []);
+            try {
+                // Wrap AI call in a timeout promise to prevent hanging
+                mappedRows[i].category = await Promise.race([
+                    guessCategory(mappedRows[i].merchant, []),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('AI Timeout')), 5000))
+                ]);
+            } catch (err) {
+                console.warn(`AI failed for ${mappedRows[i].merchant}:`, err);
+                mappedRows[i].category = 'Diversos';
+            }
         }
       }
       

@@ -562,7 +562,7 @@ async function parseAndRenderPdf(file) {
                 id: generateStableId(payload),
                 user_id: userId,
                 category: category,
-                source: 'pdf' // Ensure source is set to 'pdf'
+                source: 'pdf' // <-- This is the key change
             };
         }));
         
@@ -586,7 +586,14 @@ function renderTable(data) {
   console.log('DEBUG: renderTable called with length:', data.length);
   
   // Deduplicate data by ID before rendering
-  const uniqueData = Array.from(new Map(data.map(item => [item.id, item])).values());
+  const map = new Map();
+  data.forEach(item => {
+    if (map.has(item.id)) {
+      console.warn(`DEBUG: Duplicate ID found, dropping: ${item.id}`, item);
+    }
+    map.set(item.id, item);
+  });
+  const uniqueData = Array.from(map.values());
   
   const body = document.getElementById('transactionsBody');
   body.innerHTML = '';

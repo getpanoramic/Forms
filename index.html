@@ -486,6 +486,7 @@ function generateStableId(payload) {
 
 async function parseAndRender(file) {
   console.log('DEBUG: parseAndRender started for:', file.name);
+  setLoading(true, 'A processar CSV...');
   Papa.parse(file, {
     header: true, skipEmptyLines: true,
     complete: async (r) => {
@@ -529,8 +530,14 @@ async function parseAndRender(file) {
       console.log('DEBUG: Data saved to DB. Calling renderTable...');
       rawData = await fetchUserTransactions();
       renderTable(rawData);
+      setLoading(false);
+      showToast('CSV processado e sincronizado!', 'success');
     },
-    error: (err) => console.error('DEBUG: Papa.parse error:', err)
+    error: (err) => {
+      console.error('DEBUG: Papa.parse error:', err);
+      setLoading(false);
+      showToast('Erro ao processar CSV: ' + err.message, 'error');
+    }
   });
 }
 

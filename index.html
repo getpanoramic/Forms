@@ -494,39 +494,41 @@ async function parseAndRender(file) {
 
   Papa.parse(file, {
     header: true, skipEmptyLines: true,
-    step: async (results, parser) => {
-      parser.pause();
+    complete: async (results) => {
+      console.log('DEBUG: Papa.parse complete. Data length:', results.data.length);
       
-      const row = results.data;
-      const amount = parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0;
-      const merchant = row['Merchant'] || '';
-      const date = row['Date (YYYY-MM-DD as UTC)'];
+      const autoCategorize = document.getElementById('autoCategorize').checked;
       
-      let category = row['Category'] || 'Diversos';
-      if (document.getElementById('autoCategorize').checked) {
-          category = await guessCategory(merchant, []); // Pass [] to avoid passing full rawData for every row
+      // Map to objects
+      const mappedRows = results.data.map(row => {
+        const amount = parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0;
+        const merchant = row['Merchant'] || '';
+        const date = row['Date (YYYY-MM-DD as UTC)'];
+        
+        const payload = { user_id: userId, date, merchant, amount };
+        
+        return {
+            id: generateStableId(payload),
+            user_id: userId,
+            date,
+            merchant,
+            amount,
+            category: row['Category'] || 'Diversos',
+            submitted: false,
+            source: 'csv'
+        };
+      });
+
+      // AI Categorization in chunks to avoid blocking/crash
+      if (autoCategorize) {
+        setLoading(true, 'A categorizar com AI...');
+        for (let i = 0; i < mappedRows.length; i++) {
+            mappedRows[i].category = await guessCategory(mappedRows[i].merchant, []);
+        }
       }
       
-      const payload = { user_id: userId, date, merchant, amount };
-      
-      allParsedRows.push({
-          id: generateStableId(payload),
-          user_id: userId,
-          date,
-          merchant,
-          amount,
-          category,
-          submitted: false,
-          source: 'csv'
-      });
-      
-      parser.resume();
-    },
-    complete: async () => {
-      console.log('DEBUG: Papa.parse complete. Data length:', allParsedRows.length);
       console.log('DEBUG: Saving to DB...');
-      
-      await saveTransactions(allParsedRows);
+      await saveTransactions(mappedRows);
       
       console.log('DEBUG: Data saved. Calling renderTable...');
       rawData = await fetchUserTransactions();

@@ -15,14 +15,13 @@ export async function saveTransactions(transactions) {
   }
   
   const transactionsToUpload = transactions.map(t => ({
-    id: t.id,
     user_id: user.id,
     date: t.date,
     merchant: t.merchant,
     amount: t.amountEur || t.amount || 0,
     category: t.csvCategory || t.category || 'Diversos',
     submitted: !!t.submitted,
-    source: t.source || 'pdf' // Changed from csv to pdf to be more accurate if source is missing or PDF
+    source: t.source || 'csv'
   }));
   
   console.log(`DEBUG: Inserting ${transactionsToUpload.length} transactions.`);

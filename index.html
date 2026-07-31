@@ -7,6 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.js"></script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0"></script>
 <style>
@@ -15,27 +16,45 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
 .card { border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e5e7eb; }
 .scrollable-table { max-height: 600px; overflow-y: auto; }
 .hidden-section { display: none; }
+.tab-active { border-color: #4f46e5; color: #4f46e5; }
 </style>
 </head>
 <body class="p-4 md:p-8">
 <div class="max-w-7xl mx-auto space-y-6">
 
-<div class="flex flex-wrap gap-4 items-center justify-between bg-white p-6 card">
-  <div>
-    <h1 class="text-2xl font-black text-gray-800">Curve Finance Dashboard</h1>
-    <p class="text-xs text-gray-400 font-bold uppercase tracking-widest">Gestão de Transações Inteligente</p>
+<!-- Header & Navigation -->
+<div class="bg-white p-6 card space-y-4">
+  <div class="flex flex-wrap gap-4 items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-black text-gray-800">Curve Finance Dashboard</h1>
+      <p class="text-xs text-gray-400 font-bold uppercase tracking-widest">Gestão de Transações Inteligente</p>
+    </div>
+    <div class="flex gap-2">
+      <button id="loginBtn" class="bg-blue-600 text-white font-black px-6 py-3 rounded-lg hover:bg-blue-700 uppercase text-xs tracking-widest transition-all">
+        Login Google
+      </button>
+      <button onclick="toggleSection('toolsArea')" class="bg-indigo-100 text-indigo-700 font-black px-6 py-3 rounded-lg hover:bg-indigo-200 uppercase text-xs tracking-widest transition-all">
+        🛠️ Configurações & Filtros
+      </button>
+      
+      <!-- Curve Upload -->
+      <label id="csvUploadBtn" class="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-6 py-3 rounded-lg uppercase text-xs tracking-widest cursor-pointer shadow-md transition-all">
+        📂 Importar CSV
+        <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+      </label>
+      
+      <!-- Bank PDF Upload -->
+      <label id="pdfUploadBtn" class="hidden-section bg-amber-500 hover:bg-amber-600 text-white font-black px-6 py-3 rounded-lg uppercase text-xs tracking-widest cursor-pointer shadow-md transition-all">
+        📄 Importar PDF
+        <input type="file" id="pdfFileInput" accept=".pdf" class="hidden">
+      </label>
+    </div>
   </div>
-  <div class="flex gap-2">
-    <button id="loginBtn" class="bg-blue-600 text-white font-black px-6 py-3 rounded-lg hover:bg-blue-700 uppercase text-xs tracking-widest transition-all">
-      Login Google
-    </button>
-    <button onclick="toggleSection('toolsArea')" class="bg-indigo-100 text-indigo-700 font-black px-6 py-3 rounded-lg hover:bg-indigo-200 uppercase text-xs tracking-widest transition-all">
-      🛠️ Configurações & Filtros
-    </button>
-    <label class="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-6 py-3 rounded-lg uppercase text-xs tracking-widest cursor-pointer shadow-md transition-all">
-      📂 Importar CSV
-      <input type="file" id="csvFileInput" accept=".csv" class="hidden">
-    </label>
+  
+  <!-- Tabs Navigation -->
+  <div class="flex gap-4 border-b border-gray-200">
+      <button onclick="switchTab('csv')" id="tabCurve" class="pb-2 border-b-2 tab-active font-bold text-sm">Dashboard Curve</button>
+      <button onclick="switchTab('pdf')" id="tabBank" class="pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700">Extracto Bancário (PDF)</button>
   </div>
 </div>
 
@@ -155,12 +174,14 @@ import { getExchangeRate } from './js/api.js';
 import { supabase, fetchUserTransactions, subscribeToTransactions } from './js/supabase.js';
 import { saveTransactions, getAllTransactions } from './js/db.js';
 import { initCharts } from './js/charts.js';
+import { parsePdf } from './js/pdfParser.js';
 
 console.log('DEBUG: Module script starting...');
 
 let rawData = [];
 let hideCurve = true;
 let RATE = 1.17;
+let currentTab = 'csv'; // 'csv' or 'pdf'
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('DEBUG: DOM fully loaded.');
@@ -184,6 +205,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.updateCategory = updateCategory;
   window.toggleSelectAll = toggleSelectAll;
   window.handleBulkAction = handleBulkAction;
+  window.switchTab = switchTab;
 
 // In DOMContentLoaded, fetch from Supabase
   setLoading(true);
@@ -217,24 +239,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('DEBUG: Login button bound.');
   }
 
-  // PWA: Service Worker Registration - TEMPORARILY DISABLED
-  /*
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(console.error);
-  }
-  */
-
   const csvInput = document.getElementById('csvFileInput');
   if (csvInput) {
-    console.log('DEBUG: Binding CSV input listener.');
-    csvInput.onchange = (e) => {
-        console.log('DEBUG: File input changed.');
-        parseAndRender(e.target.files[0]);
-    };
+    csvInput.onchange = (e) => parseAndRender(e.target.files[0]);
+  }
+  
+  const pdfInput = document.getElementById('pdfFileInput');
+  if (pdfInput) {
+    pdfInput.onchange = (e) => parseAndRenderPdf(e.target.files[0]);
   }
 });
 
 function toggleSection(id) { document.getElementById(id).classList.toggle('hidden-section'); }
+
+function switchTab(tab) {
+    currentTab = tab;
+    
+    // Update active tab styles
+    const tabCurve = document.getElementById('tabCurve');
+    const tabBank = document.getElementById('tabBank');
+    const csvUploadBtn = document.getElementById('csvUploadBtn');
+    const pdfUploadBtn = document.getElementById('pdfUploadBtn');
+    
+    if (tab === 'csv') {
+        tabCurve.className = "pb-2 border-b-2 tab-active font-bold text-sm";
+        tabBank.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
+        csvUploadBtn.classList.remove('hidden-section');
+        pdfUploadBtn.classList.add('hidden-section');
+    } else {
+        tabCurve.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
+        tabBank.className = "pb-2 border-b-2 tab-active font-bold text-sm";
+        csvUploadBtn.classList.add('hidden-section');
+        pdfUploadBtn.classList.remove('hidden-section');
+    }
+    
+    renderTable(rawData);
+}
 
 // --- Auth Handling ---
 async function handleLogin() {
@@ -261,7 +301,8 @@ async function migrateDataToSupabase(user) {
     merchant: t.merchant,
     amount: t.amountEur || 0,
     category: t.csvCategory || 'Diversos',
-    submitted: false
+    submitted: false,
+    source: t.source || 'csv'
   }));
 
   const { error } = await supabase.from('transactions').insert(transactionsToUpload);
@@ -321,7 +362,6 @@ async function handleBulkAction() {
         for (const id of selectedIds) {
             const row = rawData.find(r => r.id === id);
             if (row) {
-                // Pass rawData here to ensure context is available
                 const newCat = await guessCategory(row.merchant, rawData);
                 await supabase.from('transactions').update({ category: newCat }).eq('id', id);
             }
@@ -331,7 +371,6 @@ async function handleBulkAction() {
     
     rawData = await fetchUserTransactions();
     renderTable(rawData);
-    initCharts(rawData); // Ensure charts are re-initialized with the full raw data
     setLoading(false);
 }
 
@@ -357,7 +396,6 @@ async function updateCategory(id, category) {
         showToast('Categoria atualizada!', 'success');
         rawData = await fetchUserTransactions();
         renderTable(rawData);
-        initCharts(rawData); // Ensure charts are re-initialized
     }
 }
 
@@ -374,7 +412,6 @@ async function submitRow(btn, date, merchant, amount, category, id) {
   btn.disabled = true; btn.innerText = '...';
 
   const formData = new URLSearchParams();
-  // IMPORTANT: Verify these IDs match your specific Google Form
   formData.append('entry.670590371', merchant);
   formData.append('entry.322048028', amount.toString().replace('.', ','));
   formData.append('entry.1886754321', category);
@@ -403,14 +440,10 @@ async function submitRow(btn, date, merchant, amount, category, id) {
           throw new Error('Supabase update failed: ' + updateError.message);
       } else {
           console.log('DEBUG: Update successful!');
-          // Small delay to ensure DB consistency
           await new Promise(resolve => setTimeout(resolve, 800));
       }
       
-      // Refresh data directly from Supabase
       rawData = await fetchUserTransactions();
-      
-      // Force UI to show all items to ensure user sees the updated record
       document.getElementById('filterStatus').value = 'All';
       renderTable(rawData);
     }
@@ -485,7 +518,8 @@ async function parseAndRender(file) {
             merchant: merchant,
             amount: amount,
             category: category,
-            submitted: false
+            submitted: false,
+            source: 'csv'
         };
       }));
       
@@ -500,6 +534,48 @@ async function parseAndRender(file) {
   });
 }
 
+async function parseAndRenderPdf(file) {
+    console.log('DEBUG: parseAndRenderPdf started for:', file.name);
+    setLoading(true);
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const userId = user ? user.id : 'anonymous';
+        
+        const parsedRows = await parsePdf(file);
+        
+        const finalRows = await Promise.all(parsedRows.map(async row => {
+            let category = 'Diversos';
+            if (document.getElementById('autoCategorize').checked) {
+                category = await guessCategory(row.merchant, rawData);
+            }
+            
+            const payload = {
+                user_id: userId,
+                date: row.date,
+                merchant: row.merchant,
+                amount: row.amount
+            };
+            
+            return {
+                ...row,
+                id: generateStableId(payload),
+                user_id: userId,
+                category: category
+            };
+        }));
+        
+        rawData = finalRows;
+        await saveTransactions(rawData);
+        rawData = await fetchUserTransactions();
+        renderTable(rawData);
+        showToast('PDF parseado e sincronizado com sucesso!', 'success');
+    } catch (err) {
+        console.error('DEBUG: PDF parse error:', err);
+        showToast('Erro no processamento do PDF: ' + err.message, 'error');
+    }
+    setLoading(false);
+}
+
 let sortConfig = { key: 'date', direction: 'desc' };
 
 function renderTable(data) {
@@ -508,7 +584,6 @@ function renderTable(data) {
   // Deduplicate data by ID before rendering
   const uniqueData = Array.from(new Map(data.map(item => [item.id, item])).values());
   
-  if (uniqueData.length > 0) console.log('DEBUG: First row data:', uniqueData[0]);
   const body = document.getElementById('transactionsBody');
   body.innerHTML = '';
   const start = document.getElementById('filterStart').value;
@@ -516,14 +591,15 @@ function renderTable(data) {
   const statusFilter = document.getElementById('filterStatus').value;
   
   let filtered = uniqueData.filter(row => {
+    // Tab filtering: Only show records from the correct source
+    const rowSource = row.source || 'csv';
+    if (rowSource !== currentTab) return false;
+    
     if (hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
     if (start && row.date < start) return false;
     if (end && row.date > end) return false;
     
-    // Log for debugging
     const isSubmitted = !!row.submitted;
-    console.log(`DEBUG: Checking row ${row.merchant}, submitted=${isSubmitted}, filter=${statusFilter}`);
-    
     if (statusFilter === 'Pending' && isSubmitted) return false;
     if (statusFilter === 'Submitted' && !isSubmitted) return false;
     
@@ -541,9 +617,7 @@ function renderTable(data) {
 
   let tDesp = 0, tEntr = 0;
   filtered.forEach((row, i) => {
-    console.log('DEBUG: Row status:', row.submitted, 'for merchant:', row.merchant);
     let valHtml = "";
-    // Unify mapping: Supabase uses 'amount', CSV parser uses 'amountEur'
     const amount = parseFloat(row.amountEur || row.amount) || 0;
     const category = row.csvCategory || row.category || 'Diversos';
     
@@ -574,7 +648,7 @@ function renderTable(data) {
         <td class="p-4"><div class="text-sm font-bold text-gray-800">${row.merchant}</div><div class="text-[9px] text-gray-400 uppercase font-black">${row.cardName || 'Curve'}</div></td>
         <td class="p-4 text-right leading-tight">${valHtml}</td>
         <td class="p-4">
-          <select onchange="updateCategory('${row.id}', this.value)" class="text-xs p-1.5 border rounded-lg bg-white font-bold w-full">
+          <select id="${catId}" onchange="updateCategory('${row.id}', this.value)" class="text-xs p-1.5 border rounded-lg bg-white font-bold w-full">
             ${Object.entries(CATEGORIES).map(([name, emoji]) => `<option value="${name}" ${name === guessed ? 'selected' : ''}>${emoji} ${name}</option>`).join('')}
           </select>
         </td>

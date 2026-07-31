@@ -13,15 +13,17 @@ export async function saveTransactions(transactions) {
   await supabase.from('transactions').delete().eq('user_id', user.id);
   
   const transactionsToUpload = transactions.map(t => ({
+    id: t.id,
     user_id: user.id,
     date: t.date,
     merchant: t.merchant,
     amount: t.amountEur || t.amount || 0,
     category: t.csvCategory || t.category || 'Diversos',
-    submitted: !!t.submitted
+    submitted: !!t.submitted,
+    source: t.source || 'csv'
   }));
   
-  await supabase.from('transactions').insert(transactionsToUpload);
+  await supabase.from('transactions').upsert(transactionsToUpload);
 }
 
 export async function getAllTransactions() {

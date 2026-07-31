@@ -487,47 +487,48 @@ function generateStableId(payload) {
 async function parseAndRender(file) {
   console.log('DEBUG: parseAndRender started for:', file.name);
   setLoading(true, 'A processar CSV...');
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  const userId = user ? user.id : 'anonymous';
+  const allParsedRows = [];
+
   Papa.parse(file, {
     header: true, skipEmptyLines: true,
-    complete: async (r) => {
-      console.log('DEBUG: Papa.parse complete. Data length:', r.data.length);
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user ? user.id : 'anonymous';
-
-      const parsedData = await Promise.all(r.data.map(async row => {
-        const amount = parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0;
-        const merchant = row['Merchant'] || '';
-        const date = row['Date (YYYY-MM-DD as UTC)'];
-        
-        // Use AI to guess category IF checkbox is checked
-        let category = row['Category'] || 'Diversos';
-        if (document.getElementById('autoCategorize').checked) {
-            category = await guessCategory(merchant, rawData);
-        }
-        
-        const payload = {
-            user_id: userId,
-            date: date,
-            merchant: merchant,
-            amount: amount
-        };
-        
-        return {
-            id: generateStableId(payload),
-            user_id: userId,
-            date: date,
-            merchant: merchant,
-            amount: amount,
-            category: category,
-            submitted: false,
-            source: 'csv'
-        };
-      }));
+    step: async (results, parser) => {
+      parser.pause();
       
-      console.log('DEBUG: Data mapped with stable IDs. Saving to DB...');
-      rawData = parsedData;
-      await saveTransactions(rawData);
-      console.log('DEBUG: Data saved to DB. Calling renderTable...');
+      const row = results.data;
+      const amount = parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0;
+      const merchant = row['Merchant'] || '';
+      const date = row['Date (YYYY-MM-DD as UTC)'];
+      
+      let category = row['Category'] || 'Diversos';
+      if (document.getElementById('autoCategorize').checked) {
+          category = await guessCategory(merchant, []); // Pass [] to avoid passing full rawData for every row
+      }
+      
+      const payload = { user_id: userId, date, merchant, amount };
+      
+      allParsedRows.push({
+          id: generateStableId(payload),
+          user_id: userId,
+          date,
+          merchant,
+          amount,
+          category,
+          submitted: false,
+          source: 'csv'
+      });
+      
+      parser.resume();
+    },
+    complete: async () => {
+      console.log('DEBUG: Papa.parse complete. Data length:', allParsedRows.length);
+      console.log('DEBUG: Saving to DB...');
+      
+      await saveTransactions(allParsedRows);
+      
+      console.log('DEBUG: Data saved. Calling renderTable...');
       rawData = await fetchUserTransactions();
       renderTable(rawData);
       setLoading(false);

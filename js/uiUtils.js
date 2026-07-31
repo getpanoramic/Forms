@@ -8,15 +8,21 @@ export function showToast(message, type = 'info') {
   setTimeout(() => toast.remove(), 3000);
 }
 
-export function setLoading(isLoading) {
+export function setLoading(isLoading, message = 'A processar...') {
   let loader = document.getElementById('globalLoader');
   if (isLoading) {
     if (!loader) {
       loader = document.createElement('div');
       loader.id = 'globalLoader';
-      loader.className = 'fixed inset-0 bg-white/50 flex items-center justify-center z-50';
-      loader.innerHTML = '<div class="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600"></div>';
+      loader.className = 'fixed inset-0 bg-white/80 flex flex-col items-center justify-center z-50';
+      loader.innerHTML = `
+        <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 mb-4"></div>
+        <p id="loaderMessage" class="text-indigo-700 font-bold">${message}</p>
+      `;
       document.body.appendChild(loader);
+    } else {
+      const msgEl = document.getElementById('loaderMessage');
+      if (msgEl) msgEl.textContent = message;
     }
   } else if (loader) {
     loader.remove();

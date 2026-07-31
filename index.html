@@ -536,12 +536,12 @@ async function parseAndRender(file) {
 
 async function parseAndRenderPdf(file) {
     console.log('DEBUG: parseAndRenderPdf started for:', file.name);
-    setLoading(true);
+    setLoading(true, 'A iniciar...');
     try {
         const { data: { user } } = await supabase.auth.getUser();
         const userId = user ? user.id : 'anonymous';
         
-        const parsedRows = await parsePdf(file);
+        const parsedRows = await parsePdf(file, (msg) => setLoading(true, msg));
         
         const finalRows = await Promise.all(parsedRows.map(async row => {
             let category = 'Diversos';

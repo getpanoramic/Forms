@@ -542,6 +542,7 @@ async function parseAndRenderPdf(file) {
         const userId = user ? user.id : 'anonymous';
         
         const parsedRows = await parsePdf(file, (msg) => setLoading(true, msg));
+        console.log('DEBUG: Parsed rows:', parsedRows.length);
         
         const finalRows = await Promise.all(parsedRows.map(async row => {
             let category = 'Diversos';
@@ -560,13 +561,16 @@ async function parseAndRenderPdf(file) {
                 ...row,
                 id: generateStableId(payload),
                 user_id: userId,
-                category: category
+                category: category,
+                source: 'pdf' // Ensure source is set to 'pdf'
             };
         }));
         
+        console.log('DEBUG: Final rows to save:', finalRows.length);
         rawData = finalRows;
         await saveTransactions(rawData);
         rawData = await fetchUserTransactions();
+        console.log('DEBUG: Data fetched from DB:', rawData.length);
         renderTable(rawData);
         showToast('PDF parseado e sincronizado com sucesso!', 'success');
     } catch (err) {
@@ -593,6 +597,7 @@ function renderTable(data) {
   let filtered = uniqueData.filter(row => {
     // Tab filtering: Only show records from the correct source
     const rowSource = row.source || 'csv';
+    console.log(`DEBUG: Row ${row.id} source: ${rowSource}, currentTab: ${currentTab}`);
     if (rowSource !== currentTab) return false;
     
     if (hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;

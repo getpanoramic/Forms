@@ -7,7 +7,13 @@ export async function saveTransactions(transactions) {
     return;
   }
 
-  console.log(`DEBUG: Deleting existing transactions for user: ${user.id}`);
+  // Determine source based on the first transaction, defaulting to 'csv'
+  const source = transactions.length > 0 ? (transactions[0].source || 'csv') : 'csv';
+  console.log(`DEBUG: Deleting existing ${source} transactions for user: ${user.id}`);
+  
+  // Note: The original logic deleted ALL transactions for the user. 
+  // If we only want to replace specific sources, we'd need to refine this. 
+  // Sticking to existing destructive behavior for now.
   const { error: deleteError } = await supabase.from('transactions').delete().eq('user_id', user.id);
   if (deleteError) {
       console.error('DEBUG: Error deleting:', deleteError);
@@ -24,7 +30,7 @@ export async function saveTransactions(transactions) {
     source: t.source || 'csv'
   }));
   
-  console.log(`DEBUG: Inserting ${transactionsToUpload.length} transactions.`);
+  console.log(`DEBUG: Inserting ${transactionsToUpload.length} transactions as ${source}.`);
   const { error: insertError } = await supabase.from('transactions').upsert(transactionsToUpload);
   if (insertError) {
       console.error('DEBUG: Error upserting:', insertError);

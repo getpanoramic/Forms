@@ -734,9 +734,9 @@ function renderTable(page = 1) {
   // Render Pagination Controls
   const paginationControls = document.getElementById('paginationControls');
   paginationControls.innerHTML = `
-    <button ${currentPage === 1 ? 'disabled' : ''} onclick="renderTable(${currentPage - 1})" class="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
+    <button ${currentPage <= 1 ? 'disabled' : ''} onclick="renderTable(${currentPage - 1})" class="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
     <span class="text-sm font-bold">Página ${currentPage} de ${totalPages}</span>
-    <button ${currentPage === totalPages ? 'disabled' : ''} onclick="renderTable(${currentPage + 1})" class="px-3 py-1 border rounded disabled:opacity-50">Próxima</button>
+    <button ${currentPage >= totalPages ? 'disabled' : ''} onclick="renderTable(${currentPage + 1})" class="px-3 py-1 border rounded disabled:opacity-50">Próxima</button>
   `;
 
   document.getElementById('statDespesa').textContent = `€ ${tDesp.toFixed(2)}`;

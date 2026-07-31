@@ -161,6 +161,7 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
         <tbody id="transactionsBody" class="divide-y divide-gray-100"></tbody>
       </table>
     </div>
+    <div id="paginationControls" class="p-4 flex gap-2 items-center justify-center border-t"></div>
   </div>
 </div>
 
@@ -728,12 +729,12 @@ function renderTable(data, page = 1) {
   });
 
   // Render Pagination Controls
-  let paginationHtml = `<div class="p-4 flex gap-2 items-center justify-center border-t">
+  const paginationControls = document.getElementById('paginationControls');
+  paginationControls.innerHTML = `
     <button ${currentPage === 1 ? 'disabled' : ''} onclick="renderTable(rawData, ${currentPage - 1})" class="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
     <span class="text-sm font-bold">Página ${currentPage} de ${totalPages}</span>
     <button ${currentPage === totalPages ? 'disabled' : ''} onclick="renderTable(rawData, ${currentPage + 1})" class="px-3 py-1 border rounded disabled:opacity-50">Próxima</button>
-  </div>`;
-  body.insertAdjacentHTML('afterend', paginationHtml); // Note: This needs to be outside the table body in the DOM structure ideally, but this works for simple rendering.
+  `;
 
   document.getElementById('statDespesa').textContent = `€ ${tDesp.toFixed(2)}`;
   document.getElementById('statEntrada').textContent = `€ ${tEntr.toFixed(2)}`;

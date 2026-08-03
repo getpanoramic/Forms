@@ -265,6 +265,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function toggleSection(id) { document.getElementById(id).classList.toggle('hidden-section'); }
 
+async function handleLogin() {
+  const { data, error } = await supabase.auth.signInWithOAuth({ 
+    provider: 'google',
+    options: {
+      redirectTo: 'https://getpanoramic.github.io/Forms/'
+    }
+  });
+  if (error) showToast(error.message, 'error');
+}
+
 function switchTab(tab) {
     window.appState.currentTab = tab;
     

@@ -574,8 +574,10 @@ async function parseAndRenderPdf(file) {
         }
         
         const finalRows = await Promise.all(parsedRows.map(async row => {
-            // AI Categorization disabled due to runtime errors
-            const category = 'Diversos';
+            let category = 'Diversos';
+            if (document.getElementById('autoCategorize').checked) {
+                category = await guessCategory(row.merchant, window.appState.rawData);
+            }
             
             const payload = {
                 user_id: userId,

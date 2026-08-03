@@ -213,6 +213,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // In DOMContentLoaded, fetch from Supabase
   setLoading(true);
   const { data: { session } } = await supabase.auth.getSession();
+  console.log('DEBUG: Session found:', !!session);
   
   if (session) {
     document.getElementById('loginBtn').textContent = 'Logout';
@@ -221,7 +222,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Clean up the URL hash
     window.history.replaceState(null, null, window.location.pathname);
     
+    console.log('DEBUG: Fetching from Supabase...');
     window.appState.rawData = await fetchUserTransactions();
+    console.log('DEBUG: Fetched from Supabase, count:', window.appState.rawData ? window.appState.rawData.length : 'NULL');
     
     // Subscribe to changes
     subscribeToTransactions(async () => {
@@ -230,10 +233,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   } else {
     // Fallback to local DB if not logged in
+    console.log('DEBUG: Fetching from Local DB...');
     window.appState.rawData = await getAllTransactions();
+    console.log('DEBUG: Fetched from Local DB, count:', window.appState.rawData ? window.appState.rawData.length : 'NULL');
   }
   
-  if (window.appState.rawData.length > 0) renderTable();
+  console.log('DEBUG: Final rawData length before render:', window.appState.rawData ? window.appState.rawData.length : 'NULL');
+  if (window.appState.rawData && window.appState.rawData.length > 0) {
+      renderTable();
+  } else {
+      console.warn('DEBUG: No data to render.');
+  }
   setLoading(false);
 
   const loginBtn = document.getElementById('loginBtn');

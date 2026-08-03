@@ -32,6 +32,9 @@ export async function parsePdf(file, onProgress) {
         });
     }
     
+    console.log('DEBUG: Extracted lines:', lines.length);
+    if (lines.length > 0) console.log('DEBUG: First few lines:', lines.slice(0, 5));
+    
     if (onProgress) onProgress('A analisar transações...');
     const rows = [];
     let currentTransaction = null;
@@ -44,6 +47,7 @@ export async function parsePdf(file, onProgress) {
         const startMatch = cleanLine.match(startRegex);
         
         if (startMatch) {
+            console.log('DEBUG: Matched start of transaction:', cleanLine);
             if (currentTransaction) rows.push(currentTransaction);
             currentTransaction = {
                 dateStr: startMatch[1],
@@ -53,6 +57,7 @@ export async function parsePdf(file, onProgress) {
             // Check if amount is in the same line
             const amountMatch = cleanLine.match(amountRegex);
             if (amountMatch) {
+                console.log('DEBUG: Amount found in start line.');
                 currentTransaction.merchant = currentTransaction.merchant.replace(amountMatch[0], '').trim();
                 currentTransaction.amountStr = amountMatch[1];
                 currentTransaction.sign = amountMatch[2];
@@ -65,6 +70,7 @@ export async function parsePdf(file, onProgress) {
         if (currentTransaction) {
             const amountMatch = cleanLine.match(amountRegex);
             if (amountMatch) {
+                console.log('DEBUG: Amount found in subsequent line for transaction.');
                 currentTransaction.merchant = (currentTransaction.merchant + ' ' + cleanLine.replace(amountMatch[0], '')).trim();
                 currentTransaction.amountStr = amountMatch[1];
                 currentTransaction.sign = amountMatch[2];
@@ -88,6 +94,8 @@ export async function parsePdf(file, onProgress) {
             source: 'pdf'
         };
     });
+    
+    console.log('DEBUG: Final parsed rows:', finalRows.length);
     
     if (onProgress) onProgress(`Sucesso! ${finalRows.length} transações encontradas.`);
     return finalRows;

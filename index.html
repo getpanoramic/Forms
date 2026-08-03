@@ -531,13 +531,26 @@ async function parseAndRender(file) {
 
 async function parseAndRenderPdf(file) {
     console.log('DEBUG: parseAndRenderPdf started for:', file.name);
+    if (!file) {
+        console.error('DEBUG: No file provided to parseAndRenderPdf');
+        return;
+    }
     setLoading(true, 'A iniciar...');
     try {
         const { data: { user } } = await supabase.auth.getUser();
         const userId = user ? user.id : 'anonymous';
+        console.log('DEBUG: User ID determined:', userId);
         
+        console.log('DEBUG: Calling parsePdf...');
         const parsedRows = await parsePdf(file, (msg) => setLoading(true, msg));
-        console.log('DEBUG: Parsed rows:', parsedRows.length);
+        console.log('DEBUG: parsePdf returned. Parsed rows count:', parsedRows ? parsedRows.length : 'NULL');
+        
+        if (!parsedRows || parsedRows.length === 0) {
+            console.warn('DEBUG: No rows parsed from PDF.');
+            setLoading(false);
+            showToast('Nenhuma transação encontrada no PDF.', 'warning');
+            return;
+        }
         
         const finalRows = await Promise.all(parsedRows.map(async row => {
             let category = 'Diversos';

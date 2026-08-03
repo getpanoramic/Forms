@@ -567,7 +567,8 @@ async function parseAndRender(file) {
       
       console.log('DEBUG: Data saved. Calling renderTable...');
       rawData = await fetchUserTransactions();
-      renderTable(rawData);
+      window.rawData = rawData; // Sync global
+      renderTable();
       setLoading(false);
       showToast('CSV processado e sincronizado!', 'success');
     },

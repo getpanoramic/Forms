@@ -187,12 +187,15 @@ let currentTab = 'csv'; // 'csv' or 'pdf'
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('DEBUG: DOM fully loaded.');
   
-  // Expose global functions to window
+  // Expose global functions and variables to window
   window.CATEGORIES = CATEGORIES;
   window.RATE = RATE;
   window.guessCategory = guessCategory;
   window.rawData = rawData; 
   window.hideCurve = hideCurve;
+  window.currentTab = currentTab;
+  window.sortConfig = sortConfig;
+  window.rowsPerPage = rowsPerPage;
   window.toggleSection = toggleSection;
   window.toggleCurve = toggleCurve;
   window.handleManualSubmit = handleManualSubmit;

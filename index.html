@@ -632,10 +632,10 @@ let currentPage = 1;
 const rowsPerPage = 20;
 
 // Updated to not take data as argument, always use global
-function renderTable(data, page = 1) {
-  // Use passed data, or global if data not provided
-  const targetData = data || window.rawData;
-  console.log('DEBUG: renderTable called. Page:', page, 'Data length:', targetData ? targetData.length : 'NULL');
+function renderTable(page = 1) {
+  // Always use the global rawData
+  const targetData = window.rawData;
+  console.log('DEBUG: renderTable called. Page:', page, 'Global data length:', targetData ? targetData.length : 'NULL');
   
   currentPage = page;
   
@@ -739,9 +739,9 @@ function renderTable(data, page = 1) {
   const t = Number(totalPages);
   
   paginationControls.innerHTML = `
-    <button ${p <= 1 ? 'disabled' : ''} onclick="renderTable(window.rawData, ${p - 1})" class="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
+    <button ${p <= 1 ? 'disabled' : ''} onclick="renderTable(${p - 1})" class="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
     <span class="text-sm font-bold">Página ${p} de ${t}</span>
-    <button ${p >= t ? 'disabled' : ''} onclick="renderTable(window.rawData, ${p + 1})" class="px-3 py-1 border rounded disabled:opacity-50">Próxima</button>
+    <button ${p >= t ? 'disabled' : ''} onclick="renderTable(${p + 1})" class="px-3 py-1 border rounded disabled:opacity-50">Próxima</button>
   `;
 
   document.getElementById('statDespesa').textContent = `€ ${tDesp.toFixed(2)}`;

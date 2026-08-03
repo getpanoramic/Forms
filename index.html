@@ -574,10 +574,8 @@ async function parseAndRenderPdf(file) {
         }
         
         const finalRows = await Promise.all(parsedRows.map(async row => {
-            let category = 'Diversos';
-            if (document.getElementById('autoCategorize').checked) {
-                category = await guessCategory(row.merchant, window.appState.rawData);
-            }
+            // AI Categorization disabled due to runtime errors
+            const category = 'Diversos';
             
             const payload = {
                 user_id: userId,
@@ -676,7 +674,7 @@ function renderTable(page = 1) {
 
   // Determine card label or account type label
   let cardLabel = row.cardName || 'Curve';
-  if (window.appState.currentTab === 'pdf' && row.type) {
+  if (row.type) {
       cardLabel = row.type.toUpperCase();
   }
 

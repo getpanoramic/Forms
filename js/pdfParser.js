@@ -33,34 +33,46 @@ export async function parsePdf(file, onProgress) {
     }
     
     console.log('DEBUG: Extracted lines:', lines.length);
-    if (lines.length > 0) console.log('DEBUG: First few lines:', lines.slice(0, 5));
     
     if (onProgress) onProgress('A analisar transações...');
     const rows = [];
     let currentTransaction = null;
+    let currentAccountType = 'current'; // Default
 
     const startRegex = /^(\d{2}-\d{2}-\d{4})\s*\/\s*\d{2}-\d{2}-\d{4}\s+(.+)/;
     const amountRegex = /(\d+,\d{2})\s*([+-])\s*(\d+,\d{2})$/;
 
     lines.forEach(line => {
-        const cleanLine = line.trim();
-        const startMatch = cleanLine.match(startRegex);
+        const cleanLine = line.trim().toUpperCase();
+        
+        // Detect Account Type
+        if (cleanLine.includes('CONTA MOEY')) {
+            currentAccountType = 'current';
+            return;
+        } else if (cleanLine.includes('CONTA POUPANÇA')) {
+            currentAccountType = 'savings';
+            return;
+        }
+
+        const startMatch = line.trim().match(startRegex);
         
         if (startMatch) {
-            console.log('DEBUG: Matched start of transaction:', cleanLine);
-            if (currentTransaction) rows.push(currentTransaction);
+            if (currentTransaction) {
+                currentTransaction.accountType = currentAccountType;
+                rows.push(currentTransaction);
+            }
             currentTransaction = {
                 dateStr: startMatch[1],
                 merchant: startMatch[2],
             };
             
             // Check if amount is in the same line
-            const amountMatch = cleanLine.match(amountRegex);
+            const amountMatch = line.trim().match(amountRegex);
             if (amountMatch) {
-                console.log('DEBUG: Amount found in start line.');
                 currentTransaction.merchant = currentTransaction.merchant.replace(amountMatch[0], '').trim();
                 currentTransaction.amountStr = amountMatch[1];
                 currentTransaction.sign = amountMatch[2];
+                currentTransaction.accountType = currentAccountType;
                 rows.push(currentTransaction);
                 currentTransaction = null;
             }
@@ -68,16 +80,16 @@ export async function parsePdf(file, onProgress) {
         }
         
         if (currentTransaction) {
-            const amountMatch = cleanLine.match(amountRegex);
+            const amountMatch = line.trim().match(amountRegex);
             if (amountMatch) {
-                console.log('DEBUG: Amount found in subsequent line for transaction.');
-                currentTransaction.merchant = (currentTransaction.merchant + ' ' + cleanLine.replace(amountMatch[0], '')).trim();
+                currentTransaction.merchant = (currentTransaction.merchant + ' ' + line.trim().replace(amountMatch[0], '')).trim();
                 currentTransaction.amountStr = amountMatch[1];
                 currentTransaction.sign = amountMatch[2];
+                currentTransaction.accountType = currentAccountType;
                 rows.push(currentTransaction);
                 currentTransaction = null;
             } else {
-                currentTransaction.merchant += ' ' + cleanLine;
+                currentTransaction.merchant += ' ' + line.trim();
             }
         }
     });
@@ -91,7 +103,8 @@ export async function parsePdf(file, onProgress) {
             amount: amount,
             category: 'Diversos',
             submitted: false,
-            source: 'pdf'
+            source: 'pdf',
+            type: r.accountType // <-- Added type field
         };
     });
     

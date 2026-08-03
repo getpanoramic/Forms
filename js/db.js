@@ -29,7 +29,8 @@ export async function saveTransactions(transactions) {
     amount: t.amountEur || t.amount || 0,
     category: t.csvCategory || t.category || 'Diversos',
     submitted: !!t.submitted,
-    source: t.source || 'csv'
+    source: t.source || 'csv',
+    type: t.type // <-- Include the new type field
   }));
   
   console.log(`DEBUG: Inserting ${transactionsToUpload.length} transactions as '${source}'.`);

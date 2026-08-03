@@ -79,10 +79,10 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
   <div class="bg-white p-6 card border-t-4 border-indigo-600">
     <h2 class="text-xl font-bold text-indigo-600 mb-4">4. Filtros</h2>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      <input type="date" id="filterStart" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold">
-      <input type="date" id="filterEnd" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold">
-      <select id="filterCat" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold"><option value="All">Todas as Categorias</option></select>
-      <select id="filterStatus" onchange="renderTable(rawData)" class="p-2 border rounded-lg font-bold">
+      <input type="date" id="filterStart" onchange="renderTable()" class="p-2 border rounded-lg font-bold">
+      <input type="date" id="filterEnd" onchange="renderTable()" class="p-2 border rounded-lg font-bold">
+      <select id="filterCat" onchange="renderTable()" class="p-2 border rounded-lg font-bold"><option value="All">Todas as Categorias</option></select>
+      <select id="filterStatus" onchange="renderTable()" class="p-2 border rounded-lg font-bold">
         <option value="All">Todos os Status</option>
         <option value="Pending">Pendentes</option>
         <option value="Submitted">Submetidos</option>
@@ -123,7 +123,7 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
   <div class="bg-white card p-6">
     <div class="flex justify-between items-center mb-4">
         <h3 class="text-xs font-black text-gray-400 uppercase">Evolução de Gastos (EUR)</h3>
-        <select id="chartPeriod" onchange="renderTable(rawData)" class="text-xs p-1 border rounded-lg font-bold">
+        <select id="chartPeriod" onchange="renderTable()" class="text-xs p-1 border rounded-lg font-bold">
             <option value="1d">1 Dia</option>
             <option value="1w">1 Semana</option>
             <option value="1m" selected>1 Mês</option>
@@ -179,23 +179,21 @@ import { parsePdf } from './js/pdfParser.js';
 
 console.log('DEBUG: Module script starting...');
 
-let rawData = [];
-let hideCurve = true;
-let RATE = 1.17;
-let currentTab = 'csv'; // 'csv' or 'pdf'
+// --- Centralized App State ---
+window.appState = {
+  rawData: [],
+  hideCurve: true,
+  currentTab: 'csv', // 'csv' or 'pdf'
+  sortConfig: { key: 'date', direction: 'desc' },
+  currentPage: 1,
+  rowsPerPage: 20,
+  RATE: 1.17
+};
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('DEBUG: DOM fully loaded.');
   
-  // Expose global functions and variables to window
-  window.CATEGORIES = CATEGORIES;
-  window.RATE = RATE;
-  window.guessCategory = guessCategory;
-  window.rawData = rawData; 
-  window.hideCurve = hideCurve;
-  window.currentTab = currentTab;
-  window.sortConfig = sortConfig;
-  window.rowsPerPage = rowsPerPage;
+  // Expose global functions to window
   window.toggleSection = toggleSection;
   window.toggleCurve = toggleCurve;
   window.handleManualSubmit = handleManualSubmit;
@@ -211,7 +209,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.handleBulkAction = handleBulkAction;
   window.switchTab = switchTab;
 
-// In DOMContentLoaded, fetch from Supabase
+  // In DOMContentLoaded, fetch from Supabase
   setLoading(true);
   const { data: { session } } = await supabase.auth.getSession();
   
@@ -222,19 +220,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Clean up the URL hash
     window.history.replaceState(null, null, window.location.pathname);
     
-    rawData = await fetchUserTransactions();
+    window.appState.rawData = await fetchUserTransactions();
     
     // Subscribe to changes
     subscribeToTransactions(async () => {
-        rawData = await fetchUserTransactions();
-        renderTable(rawData);
+        window.appState.rawData = await fetchUserTransactions();
+        renderTable();
     });
   } else {
     // Fallback to local DB if not logged in
-    rawData = await getAllTransactions();
+    window.appState.rawData = await getAllTransactions();
   }
   
-  if (rawData.length > 0) renderTable(rawData);
+  if (window.appState.rawData.length > 0) renderTable();
   setLoading(false);
 
   const loginBtn = document.getElementById('loginBtn');
@@ -257,7 +255,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 function toggleSection(id) { document.getElementById(id).classList.toggle('hidden-section'); }
 
 function switchTab(tab) {
-    currentTab = tab;
+    window.appState.currentTab = tab;
     
     // Update active tab styles
     const tabCurve = document.getElementById('tabCurve');
@@ -277,64 +275,13 @@ function switchTab(tab) {
         pdfUploadBtn.classList.remove('hidden-section');
     }
     
-    renderTable(rawData);
+    renderTable();
 }
-
-// --- Auth Handling ---
-async function handleLogin() {
-  const { data, error } = await supabase.auth.signInWithOAuth({ 
-    provider: 'google',
-    options: {
-      redirectTo: 'https://getpanoramic.github.io/Forms/'
-    }
-  });
-  if (error) showToast(error.message, 'error');
-}
-
-async function migrateDataToSupabase(user) {
-  setLoading(true);
-  const localData = await getAllTransactions();
-  if (localData.length === 0) {
-    setLoading(false);
-    return;
-  }
-
-  const transactionsToUpload = localData.map(t => ({
-    user_id: user.id,
-    date: t.date,
-    merchant: t.merchant,
-    amount: t.amountEur || 0,
-    category: t.csvCategory || 'Diversos',
-    submitted: false,
-    source: t.source || 'csv'
-  }));
-
-  const { error } = await supabase.from('transactions').insert(transactionsToUpload);
-  if (error) {
-    showToast('Erro na migração de dados', 'error');
-    console.error(error);
-  } else {
-    showToast('Dados sincronizados com a cloud!', 'success');
-  }
-  setLoading(false);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('loginBtn').onclick = handleLogin;
-});
-
-supabase.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_IN') {
-    document.getElementById('loginBtn').textContent = 'Logout';
-    document.getElementById('loginBtn').onclick = () => supabase.auth.signOut();
-    migrateDataToSupabase(session.user);
-  }
-});
 
 function toggleCurve() {
-  hideCurve = !hideCurve;
-  document.getElementById('toggleBtn').textContent = hideCurve ? "Mostrar Curve Cash" : "Ocultar Curve Cash";
-  renderTable(rawData);
+  window.appState.hideCurve = !window.appState.hideCurve;
+  document.getElementById('toggleBtn').textContent = window.appState.hideCurve ? "Mostrar Curve Cash" : "Ocultar Curve Cash";
+  renderTable();
 }
 
 // --- Bulk Actions ---
@@ -364,27 +311,27 @@ async function handleBulkAction() {
         else showToast('Transações marcadas como submetidas!', 'success');
     } else if (action === 'aiCategorize') {
         for (const id of selectedIds) {
-            const row = rawData.find(r => r.id === id);
+            const row = window.appState.rawData.find(r => r.id === id);
             if (row) {
-                const newCat = await guessCategory(row.merchant, rawData);
+                const newCat = await guessCategory(row.merchant, window.appState.rawData);
                 await supabase.from('transactions').update({ category: newCat }).eq('id', id);
             }
         }
         showToast('Transações categorizadas!', 'success');
     }
     
-    rawData = await fetchUserTransactions();
-    renderTable(rawData);
+    window.appState.rawData = await fetchUserTransactions();
+    renderTable();
     setLoading(false);
 }
 
 async function updateCategory(id, category) {
     let finalCategory = category;
     if (category === 'auto_ai') {
-        const row = rawData.find(r => r.id === id);
+        const row = window.appState.rawData.find(r => r.id === id);
         if (row) {
             setLoading(true);
-            finalCategory = await guessCategory(row.merchant, rawData);
+            finalCategory = await guessCategory(row.merchant, window.appState.rawData);
             setLoading(false);
         }
     }
@@ -398,8 +345,8 @@ async function updateCategory(id, category) {
         console.error(error);
     } else {
         showToast('Categoria atualizada!', 'success');
-        rawData = await fetchUserTransactions();
-        renderTable(rawData);
+        window.appState.rawData = await fetchUserTransactions();
+        renderTable();
     }
 }
 
@@ -447,9 +394,9 @@ async function submitRow(btn, date, merchant, amount, category, id) {
           await new Promise(resolve => setTimeout(resolve, 800));
       }
       
-      rawData = await fetchUserTransactions();
+      window.appState.rawData = await fetchUserTransactions();
       document.getElementById('filterStatus').value = 'All';
-      renderTable(rawData);
+      renderTable();
     }
     btn.innerText = 'OK ✅';
     showToast('Transação enviada com sucesso!', 'success');
@@ -569,8 +516,7 @@ async function parseAndRender(file) {
       await saveTransactions(mappedRows);
       
       console.log('DEBUG: Data saved. Calling renderTable...');
-      rawData = await fetchUserTransactions();
-      window.rawData = rawData; // Sync global
+      window.appState.rawData = await fetchUserTransactions();
       renderTable();
       setLoading(false);
       showToast('CSV processado e sincronizado!', 'success');
@@ -596,7 +542,7 @@ async function parseAndRenderPdf(file) {
         const finalRows = await Promise.all(parsedRows.map(async row => {
             let category = 'Diversos';
             if (document.getElementById('autoCategorize').checked) {
-                category = await guessCategory(row.merchant, rawData);
+                category = await guessCategory(row.merchant, window.appState.rawData);
             }
             
             const payload = {
@@ -616,11 +562,11 @@ async function parseAndRenderPdf(file) {
         }));
         
         console.log('DEBUG: Final rows to save:', finalRows.length);
-        rawData = finalRows;
-        await saveTransactions(rawData);
-        rawData = await fetchUserTransactions();
-        console.log('DEBUG: Data fetched from DB:', rawData.length);
-        renderTable(rawData);
+        window.appState.rawData = finalRows;
+        await saveTransactions(window.appState.rawData);
+        window.appState.rawData = await fetchUserTransactions();
+        console.log('DEBUG: Data fetched from DB:', window.appState.rawData.length);
+        renderTable();
         showToast('PDF parseado e sincronizado com sucesso!', 'success');
     } catch (err) {
         console.error('DEBUG: PDF parse error:', err);
@@ -629,18 +575,13 @@ async function parseAndRenderPdf(file) {
     setLoading(false);
 }
 
-let sortConfig = { key: 'date', direction: 'desc' };
-
-let currentPage = 1;
-const rowsPerPage = 20;
-
 // Updated to not take data as argument, always use global
 function renderTable(page = 1) {
-  // Always use the global rawData
-  const targetData = window.rawData;
+  // Always use the global appState.rawData
+  const targetData = window.appState.rawData;
   console.log('DEBUG: renderTable called. Page:', page, 'Global data length:', targetData ? targetData.length : 'NULL');
   
-  currentPage = page;
+  window.appState.currentPage = page;
   
   // Deduplicate data by ID before rendering
   const map = new Map();
@@ -658,9 +599,9 @@ function renderTable(page = 1) {
   let filtered = uniqueData.filter(row => {
     // Tab filtering: Only show records from the correct source
     const rowSource = row.source || 'csv';
-    if (rowSource !== currentTab) return false;
+    if (rowSource !== window.appState.currentTab) return false;
     
-    if (hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
+    if (window.appState.hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
     if (start && row.date < start) return false;
     if (end && row.date > end) return false;
     
@@ -673,14 +614,14 @@ function renderTable(page = 1) {
 
   // Sorting
   filtered.sort((a, b) => {
-    if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+    if (a[window.appState.sortConfig.key] < b[window.appState.sortConfig.key]) return window.appState.sortConfig.direction === 'asc' ? -1 : 1;
+    if (a[window.appState.sortConfig.key] > b[window.appState.sortConfig.key]) return window.appState.sortConfig.direction === 'asc' ? 1 : -1;
     return 0;
   });
 
   // Pagination
-  const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
-  const paginatedData = filtered.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  const totalPages = Math.ceil(filtered.length / window.appState.rowsPerPage) || 1;
+  const paginatedData = filtered.slice((window.appState.currentPage - 1) * window.appState.rowsPerPage, window.appState.currentPage * window.appState.rowsPerPage);
 
   console.log('DEBUG: Filtered data length:', filtered.length, 'Pages:', totalPages);
 
@@ -701,7 +642,7 @@ function renderTable(page = 1) {
     
     if (row.fundingCurrency === 'CPT') {
       const pts = Math.abs(finalEur);
-      const eur = pts * 0.01 * RATE;
+      const eur = pts * 0.01 * window.appState.RATE;
       valHtml = `<div class="text-emerald-600 font-bold">${pts}pts</div><div class="text-[10px] text-gray-400">(${eur.toFixed(2)}€)</div>`;
       finalEur = eur;
     } else if (row.spendCurrency !== 'EUR' && row.spendCurrency !== '' && row.spendCurrency !== undefined) {
@@ -711,7 +652,7 @@ function renderTable(page = 1) {
       valHtml = `<div class="${finalEur < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${Math.abs(finalEur).toFixed(2)}€</div>`;
     }
     
-    const catId = `cat_${i + (currentPage-1)*rowsPerPage}`;
+    const catId = `cat_${i + (window.appState.currentPage-1)*window.appState.rowsPerPage}`;
     const merchantSafe = row.merchant.replace(/'/g, "").replace(/"/g, "");
 
     body.insertAdjacentHTML('beforeend', `
@@ -738,7 +679,7 @@ function renderTable(page = 1) {
 
   // Render Pagination Controls
   const paginationControls = document.getElementById('paginationControls');
-  const p = Number(currentPage);
+  const p = Number(window.appState.currentPage);
   const t = Number(totalPages);
   
   paginationControls.innerHTML = `
@@ -770,13 +711,13 @@ function renderTable(page = 1) {
 }
 
 function sortTable(key) {
-  if (sortConfig.key === key) {
-    sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+  if (window.appState.sortConfig.key === key) {
+    window.appState.sortConfig.direction = window.appState.sortConfig.direction === 'asc' ? 'desc' : 'asc';
   } else {
-    sortConfig.key = key;
-    sortConfig.direction = 'desc';
+    window.appState.sortConfig.key = key;
+    window.appState.sortConfig.direction = 'desc';
   }
-  renderTable(rawData);
+  renderTable();
 }
 
 document.getElementById('csvFileInput').onchange = (e) => parseAndRender(e.target.files[0]);

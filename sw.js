@@ -26,6 +26,11 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Bypass Service Worker for Supabase auth/API requests to avoid breaking OAuth flow
+  if (event.request.url.includes('supabase.co')) {
+    return;
+  }
+
   if (event.request.method === 'POST' && event.request.url.includes('/Forms/')) {
     event.respondWith((async () => {
       try {

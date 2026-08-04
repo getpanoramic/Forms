@@ -574,10 +574,7 @@ async function parseAndRenderPdf(file) {
         }
         
         const finalRows = await Promise.all(parsedRows.map(async row => {
-            let category = 'Diversos';
-            if (document.getElementById('autoCategorize').checked) {
-                category = await guessCategory(row.merchant, window.appState.rawData);
-            }
+            const category = 'Diversos';
             
             const payload = {
                 user_id: userId,
@@ -683,7 +680,7 @@ function renderTable(page = 1) {
       // Apply different colors based on type
       if (row.type === 'savings') {
           labelClass = "text-emerald-600"; // Green for savings
-      } else {
+      } else if (row.type === 'current') {
           labelClass = "text-indigo-600"; // Indigo for current
       }
   }
@@ -699,22 +696,30 @@ function renderTable(page = 1) {
   } else {
     valHtml = `<div class="${finalEur < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${Math.abs(finalEur).toFixed(2)}€</div>`;
   }
-...
-        <td class="p-4 text-right leading-tight">${valHtml}</td>
-        <td class="p-4">
-          <select id="${catId}" onchange="updateCategory('${row.id}', this.value)" class="text-xs p-1.5 border rounded-lg bg-white font-bold w-full">
-            ${Object.entries(CATEGORIES).map(([name, emoji]) => `<option value="${name}" ${name === guessed ? 'selected' : ''}>${emoji} ${name}</option>`).join('')}
-          </select>
-        </td>
-        <td class="p-4 text-center">
-          ${row.submitted ? 
-            '<span class="text-emerald-600 font-black text-xs">Submetido ✅</span>' : 
-            `<button onclick="handleTableSubmit(this, '${row.date}', '${merchantSafe}', ${finalEur.toFixed(2)}, '${catId}', '${row.id}')"
-              class="bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow">Submeter</button>`
-          }
-        </td>
-      </tr>
-    `);
+
+  const catId = `cat_${i + (window.appState.currentPage-1)*window.appState.rowsPerPage}`;
+  const merchantSafe = row.merchant.replace(/'/g, "").replace(/"/g, "");
+
+  body.insertAdjacentHTML('beforeend', `
+    <tr class="hover:bg-gray-50">
+      <td class="p-4"><input type="checkbox" class="row-checkbox" data-id="${row.id}"></td>
+      <td class="p-4 text-xs font-bold text-gray-400">${row.date}</td>
+      <td class="p-4"><div class="text-sm font-bold text-gray-800">${row.merchant}</div><div class="text-[9px] ${labelClass} uppercase font-black">${cardLabel}</div></td>
+      <td class="p-4 text-right leading-tight">${valHtml}</td>
+      <td class="p-4">
+        <select id="${catId}" onchange="updateCategory('${row.id}', this.value)" class="text-xs p-1.5 border rounded-lg bg-white font-bold w-full">
+          ${Object.entries(CATEGORIES).map(([name, emoji]) => `<option value="${name}" ${name === guessed ? 'selected' : ''}>${emoji} ${name}</option>`).join('')}
+        </select>
+      </td>
+      <td class="p-4 text-center">
+        ${row.submitted ? 
+          '<span class="text-emerald-600 font-black text-xs">Submetido ✅</span>' : 
+          `<button onclick="handleTableSubmit(this, '${row.date}', '${merchantSafe}', ${finalEur.toFixed(2)}, '${catId}', '${row.id}')"
+            class="bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest shadow">Submeter</button>`
+        }
+      </td>
+    </tr>
+  `);
   });
 
   // Render Pagination Controls

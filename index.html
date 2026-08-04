@@ -267,17 +267,15 @@ function toggleSection(id) { document.getElementById(id).classList.toggle('hidde
 
 async function handleLogin() {
   showToast('A redirecionar para o Google...', 'info');
-  console.log('DEBUG: Attempting signInWithRedirect...');
-  const { error } = await supabase.auth.signInWithRedirect({ 
-    provider: 'google',
-    options: {
-      redirectTo: window.location.origin + window.location.pathname
-    }
-  });
-  if (error) {
-      console.error('DEBUG: Login error:', error);
-      showToast('Erro de login: ' + error.message, 'error');
-  }
+  
+  // Construct URL manually to bypass SDK redirect issues
+  const baseUrl = 'https://rjfjojghtzkccbscwqby.supabase.co/auth/v1/authorize';
+  const provider = 'google';
+  const redirectTo = encodeURIComponent(window.location.origin + window.location.pathname);
+  const authUrl = `${baseUrl}?provider=${provider}&redirect_to=${redirectTo}`;
+  
+  console.log('DEBUG: Navigating to:', authUrl);
+  window.location.href = authUrl;
 }
 
 function switchTab(tab) {

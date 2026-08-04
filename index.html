@@ -701,10 +701,11 @@ function renderTable(page = 1) {
     if (merchantLower.includes('cpt') || merchantLower.includes('curve cash')) {
         const points = Math.abs(amount);
         const gbpValue = points / 100; // 1 CPT = 1 pence = £0.01
+        const eurValue = gbpValue * window.appState.RATE;
         
-        // Show GBP value in main cell, points in parentheses
-        valHtml = `<div class="text-emerald-600 font-bold">£${gbpValue.toFixed(2)}</div>
-                   <div class="text-[10px] text-gray-400">(${points.toFixed(0)} pts)</div>`;
+        // Show EUR value in main cell, GBP and points in parentheses
+        valHtml = `<div class="text-emerald-600 font-bold">${eurValue.toFixed(2)}€</div>
+                   <div class="text-[10px] text-gray-400">(£${gbpValue.toFixed(2)} / ${points.toFixed(0)} pts)</div>`;
     } else {
         // Standard display for EUR
         valHtml = `<div class="${amount < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${amount.toFixed(2)}€</div>`;

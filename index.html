@@ -476,9 +476,17 @@ async function parseAndRender(file) {
       
       // Map to objects
       const mappedRows = results.data.map(row => {
-        const amount = parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0;
+        let amount = parseFloat(row['Txn Amount (Funding Card)']?.toString().replace(',', '.')) || 0;
         const merchant = row['Merchant'] || '';
+        const cardName = row['Card Name'] || '';
         const date = row['Date (YYYY-MM-DD as UTC)'];
+        
+        // Normalize CSV: Curve Cash/CPT are positive (income), others are expenses (negative)
+        // Check both Card Name and Merchant for identification
+        const identifierString = (merchant + ' ' + cardName).toLowerCase();
+        if (!identifierString.includes('curve cash') && !identifierString.includes('cpt')) {
+            amount = -Math.abs(amount);
+        }
         
         const payload = { user_id: userId, date, merchant, amount };
         

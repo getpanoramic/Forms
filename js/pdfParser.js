@@ -100,11 +100,11 @@ export async function parsePdf(file, onProgress) {
         return {
             date: r.dateStr.split('-').reverse().join('-'), // YYYY-MM-DD
             merchant: r.merchant.trim(),
-            amount: amount,
+            amount: amount, // Keep as signed (negative for expenses)
             category: 'Diversos',
             submitted: false,
             source: 'pdf',
-            type: r.accountType // <-- Added type field
+            type: r.accountType
         };
     });
     

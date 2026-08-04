@@ -266,10 +266,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 function toggleSection(id) { document.getElementById(id).classList.toggle('hidden-section'); }
 
 async function handleLogin() {
-  const { data, error } = await supabase.auth.signInWithOAuth({ 
+  const { error } = await supabase.auth.signInWithRedirect({ 
     provider: 'google',
     options: {
-      redirectTo: 'https://getpanoramic.github.io/Forms/'
+      redirectTo: window.location.origin + window.location.pathname
     }
   });
   if (error) showToast(error.message, 'error');

@@ -266,7 +266,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 function toggleSection(id) { document.getElementById(id).classList.toggle('hidden-section'); }
 
 async function handleLogin() {
-  alert('Tentando login...');
+  showToast('A redirecionar para o Google...', 'info');
+  console.log('DEBUG: Attempting signInWithRedirect...');
   const { error } = await supabase.auth.signInWithRedirect({ 
     provider: 'google',
     options: {
@@ -274,8 +275,8 @@ async function handleLogin() {
     }
   });
   if (error) {
-      alert('Erro de login: ' + error.message);
-      showToast(error.message, 'error');
+      console.error('DEBUG: Login error:', error);
+      showToast('Erro de login: ' + error.message, 'error');
   }
 }
 

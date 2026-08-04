@@ -696,8 +696,16 @@ function renderTable(page = 1) {
         }
     }
 
-    // Display logic: show sign for all
-    valHtml = `<div class="${amount < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${amount.toFixed(2)}€</div>`;
+    // Display logic: check if it is a CPT transaction
+    if (row.merchant && row.merchant.toLowerCase().includes('cpt')) {
+        const points = Math.abs(amount);
+        const eurValue = points * 0.01 * window.appState.RATE;
+        valHtml = `<div class="text-emerald-600 font-bold">${eurValue.toFixed(2)}€</div>
+                   <div class="text-[10px] text-gray-400">(${points.toFixed(0)} pts)</div>`;
+    } else {
+        // Standard display for EUR
+        valHtml = `<div class="${amount < 0 ? 'text-rose-500' : 'text-emerald-600'} font-bold">${amount.toFixed(2)}€</div>`;
+    }
 
     const catId = `cat_${i + (window.appState.currentPage-1)*window.appState.rowsPerPage}`;
     const merchantSafe = row.merchant.replace(/'/g, "").replace(/"/g, "");

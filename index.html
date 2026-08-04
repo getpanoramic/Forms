@@ -696,8 +696,9 @@ function renderTable(page = 1) {
         }
     }
 
-    // Display logic: check if it is a CPT transaction
-    if (row.merchant && row.merchant.toLowerCase().includes('cpt')) {
+    // Display logic: check if it is a CPT/Curve Cash transaction
+    const merchantLower = row.merchant.toLowerCase();
+    if (merchantLower.includes('cpt') || merchantLower.includes('curve cash')) {
         const points = Math.abs(amount);
         const gbpValue = points / 100; // 1 CPT = 1 pence = £0.01
         

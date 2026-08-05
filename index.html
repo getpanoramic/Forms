@@ -302,12 +302,12 @@ function loadSettings() {
         if (settings.filterStatus) document.getElementById('filterStatus').value = settings.filterStatus;
         if (settings.autoCategorize !== undefined) document.getElementById('autoCategorize').checked = settings.autoCategorize;
         if (settings.chartPeriod) document.getElementById('chartPeriod').value = settings.chartPeriod;
-        
+
         // Restore State
         if (settings.currentTab) {
             window.appState.currentTab = settings.currentTab;
             // Update UI tab appearance
-            switchTab(settings.currentTab);
+            switchTab(settings.currentTab, false);
         }
         if (settings.hideCurve !== undefined) {
             window.appState.hideCurve = settings.hideCurve;
@@ -329,7 +329,7 @@ async function handleLogin() {
   window.open(authUrl, '_blank');
 }
 
-function switchTab(tab) {
+function switchTab(tab, shouldRender = true) {
     window.appState.currentTab = tab;
     
     // Update active tab styles
@@ -350,7 +350,7 @@ function switchTab(tab) {
         pdfUploadBtn.classList.remove('hidden-section');
     }
     
-    renderTable();
+    if (shouldRender) renderTable();
     saveSettings(); // Save state on change
 }
 

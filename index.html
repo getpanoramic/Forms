@@ -813,6 +813,7 @@ function renderTable(page = 1) {
   // Fix Chart Filtering
   const period = document.getElementById('chartPeriod').value;
   let chartFiltered = filtered;
+  console.log('DEBUG: renderTable, filter period:', period, 'initial filtered length:', filtered.length);
   if (period !== 'all') {
       const now = new Date();
       let limitDate = new Date();
@@ -822,6 +823,7 @@ function renderTable(page = 1) {
       else if (period === '3m') limitDate.setMonth(now.getMonth() - 3);
       
       chartFiltered = filtered.filter(t => new Date(t.date) >= limitDate);
+      console.log('DEBUG: renderTable, chartFiltered length after date filter:', chartFiltered.length, 'limitDate:', limitDate);
   }
   
   initCharts(chartFiltered);

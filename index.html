@@ -211,6 +211,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load saved settings
   loadSettings();
   
+  // Store the saved tab to re-apply later if needed
+  const savedSettings = JSON.parse(localStorage.getItem('appSettings'));
+  
   // Expose global functions to window
   window.toggleSection = toggleSection;
   window.toggleCurve = toggleCurve;
@@ -262,6 +265,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
       console.warn('DEBUG: No data to render.');
   }
+
+  // Re-apply tab after potential render
+  if (savedSettings && savedSettings.currentTab) {
+      console.log('DEBUG: DOMContentLoaded, re-applying tab:', savedSettings.currentTab);
+      switchTab(savedSettings.currentTab, true);
+  }
+
   setLoading(false);
 
   const csvInput = document.getElementById('csvFileInput');
@@ -294,6 +304,7 @@ function saveSettings() {
 
 function loadSettings() {
     const savedSettings = localStorage.getItem('appSettings');
+    console.log('DEBUG: loadSettings, savedSettings:', savedSettings);
     if (savedSettings) {
         const settings = JSON.parse(savedSettings);
         if (settings.endpointUrl) document.getElementById('endpointUrl').value = settings.endpointUrl;
@@ -305,6 +316,7 @@ function loadSettings() {
 
         // Restore State
         if (settings.currentTab) {
+            console.log('DEBUG: loadSettings, restoring tab:', settings.currentTab);
             window.appState.currentTab = settings.currentTab;
             // Update UI tab appearance
             switchTab(settings.currentTab, false);

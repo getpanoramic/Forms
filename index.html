@@ -61,7 +61,7 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
 <div id="toolsArea" class="hidden-section space-y-6">
   <div class="bg-white p-6 card border-t-4 border-slate-800">
     <h2 class="text-xl font-bold text-slate-800 mb-4">Configuração do Google Forms</h2>
-    <input type="text" id="endpointUrl" class="w-full p-2 border rounded-lg bg-gray-50 font-mono text-sm"
+    <input type="text" id="endpointUrl" onchange="saveSettings()" class="w-full p-2 border rounded-lg bg-gray-50 font-mono text-sm"
       value="https://docs.google.com/forms/d/e/1FAIpQLSfKuL6nzTceUZfUzidBwhizoFLBC3vyYT_OmncWfN99QTwhKQ/formResponse">
   </div>
 
@@ -79,10 +79,10 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
   <div class="bg-white p-6 card border-t-4 border-indigo-600">
     <h2 class="text-xl font-bold text-indigo-600 mb-4">4. Filtros</h2>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      <input type="date" id="filterStart" onchange="renderTable()" class="p-2 border rounded-lg font-bold">
-      <input type="date" id="filterEnd" onchange="renderTable()" class="p-2 border rounded-lg font-bold">
-      <select id="filterCat" onchange="renderTable()" class="p-2 border rounded-lg font-bold"><option value="All">Todas as Categorias</option></select>
-      <select id="filterStatus" onchange="renderTable()" class="p-2 border rounded-lg font-bold">
+      <input type="date" id="filterStart" onchange="renderTable(); saveSettings();" class="p-2 border rounded-lg font-bold">
+      <input type="date" id="filterEnd" onchange="renderTable(); saveSettings();" class="p-2 border rounded-lg font-bold">
+      <select id="filterCat" onchange="renderTable(); saveSettings();" class="p-2 border rounded-lg font-bold"><option value="All">Todas as Categorias</option></select>
+      <select id="filterStatus" onchange="renderTable(); saveSettings();" class="p-2 border rounded-lg font-bold">
         <option value="All">Todos os Status</option>
         <option value="Pending">Pendentes</option>
         <option value="Submitted">Submetidos</option>
@@ -90,7 +90,7 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
     </div>
     <button id="toggleBtn" onclick="toggleCurve()" class="w-full bg-slate-500 text-white font-black py-3 rounded-lg uppercase text-xs tracking-widest">Mostrar Curve Cash</button>
     <div class="mt-4 flex items-center gap-2">
-      <input type="checkbox" id="autoCategorize" checked class="w-4 h-4 text-blue-600">
+      <input type="checkbox" id="autoCategorize" onchange="saveSettings()" checked class="w-4 h-4 text-blue-600">
       <label for="autoCategorize" class="text-xs font-bold text-slate-700">Auto-Atribuir Categoria (AI)</label>
     </div>
   </div>
@@ -123,7 +123,7 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
   <div class="bg-white card p-6">
     <div class="flex justify-between items-center mb-4">
         <h3 class="text-xs font-black text-gray-400 uppercase">Evolução de Gastos (EUR)</h3>
-        <select id="chartPeriod" onchange="renderTable()" class="text-xs p-1 border rounded-lg font-bold">
+        <select id="chartPeriod" onchange="renderTable(); saveSettings();" class="text-xs p-1 border rounded-lg font-bold">
             <option value="1d">1 Dia</option>
             <option value="1w">1 Semana</option>
             <option value="1m" selected>1 Mês</option>
@@ -193,6 +193,9 @@ window.appState = {
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('DEBUG: DOM fully loaded.');
   
+  // Load saved settings
+  loadSettings();
+  
   // Expose global functions to window
   window.toggleSection = toggleSection;
   window.toggleCurve = toggleCurve;
@@ -209,6 +212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.handleBulkAction = handleBulkAction;
   window.switchTab = switchTab;
   window.handleLogin = handleLogin;
+  window.saveSettings = saveSettings;
 
   // In DOMContentLoaded, fetch from Supabase
   setLoading(true);
@@ -264,6 +268,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function toggleSection(id) { document.getElementById(id).classList.toggle('hidden-section'); }
+
+// --- Persistence Logic ---
+function saveSettings() {
+    const settings = {
+        endpointUrl: document.getElementById('endpointUrl').value,
+        filterStart: document.getElementById('filterStart').value,
+        filterEnd: document.getElementById('filterEnd').value,
+        filterStatus: document.getElementById('filterStatus').value,
+        autoCategorize: document.getElementById('autoCategorize').checked,
+        chartPeriod: document.getElementById('chartPeriod').value
+    };
+    localStorage.setItem('appSettings', JSON.stringify(settings));
+}
+
+function loadSettings() {
+    const savedSettings = localStorage.getItem('appSettings');
+    if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        if (settings.endpointUrl) document.getElementById('endpointUrl').value = settings.endpointUrl;
+        if (settings.filterStart) document.getElementById('filterStart').value = settings.filterStart;
+        if (settings.filterEnd) document.getElementById('filterEnd').value = settings.filterEnd;
+        if (settings.filterStatus) document.getElementById('filterStatus').value = settings.filterStatus;
+        if (settings.autoCategorize !== undefined) document.getElementById('autoCategorize').checked = settings.autoCategorize;
+        if (settings.chartPeriod) document.getElementById('chartPeriod').value = settings.chartPeriod;
+    }
+}
 
 async function handleLogin() {
   showToast('A redirecionar para o Google...', 'info');

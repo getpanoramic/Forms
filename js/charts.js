@@ -1,7 +1,10 @@
 let chartCat, chartTime;
 
 export function initCharts(data) {
-  console.log('DEBUG: initCharts called.');
+  console.log('DEBUG: initCharts called. Data length:', data ? data.length : 'NULL');
+  if (data && data.length > 0) {
+      console.log('DEBUG: First data item:', data[0]);
+  }
   const ChartInstance = window.Chart;
   
   if (!ChartInstance) {

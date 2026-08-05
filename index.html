@@ -190,6 +190,21 @@ window.appState = {
   RATE: 1.17
 };
 
+// --- Auth Handling (Expose immediately) ---
+async function handleLogin() {
+  showToast('A redirecionar para o Google...', 'info');
+  
+  // Construct URL manually to bypass SDK redirect issues
+  const baseUrl = 'https://rjfjojghtzkccbscwqby.supabase.co/auth/v1/authorize';
+  const provider = 'google';
+  const redirectTo = encodeURIComponent(window.location.origin + window.location.pathname);
+  const authUrl = `${baseUrl}?provider=${provider}&redirect_to=${redirectTo}`;
+  
+  console.log('DEBUG: Navigating to:', authUrl);
+  window.open(authUrl, '_blank');
+}
+window.handleLogin = handleLogin;
+
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('DEBUG: DOM fully loaded.');
   
@@ -211,7 +226,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.toggleSelectAll = toggleSelectAll;
   window.handleBulkAction = handleBulkAction;
   window.switchTab = switchTab;
-  window.handleLogin = handleLogin;
   window.saveSettings = saveSettings;
 
   // In DOMContentLoaded, fetch from Supabase
@@ -249,12 +263,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.warn('DEBUG: No data to render.');
   }
   setLoading(false);
-
-  const loginBtn = document.getElementById('loginBtn');
-  if (loginBtn) {
-    loginBtn.onclick = handleLogin;
-    console.log('DEBUG: Login button bound.');
-  }
 
   const csvInput = document.getElementById('csvFileInput');
   if (csvInput) {
@@ -318,7 +326,7 @@ async function handleLogin() {
   const authUrl = `${baseUrl}?provider=${provider}&redirect_to=${redirectTo}`;
   
   console.log('DEBUG: Navigating to:', authUrl);
-  window.location.href = authUrl;
+  window.open(authUrl, '_blank');
 }
 
 function switchTab(tab) {

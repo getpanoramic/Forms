@@ -277,7 +277,9 @@ function saveSettings() {
         filterEnd: document.getElementById('filterEnd').value,
         filterStatus: document.getElementById('filterStatus').value,
         autoCategorize: document.getElementById('autoCategorize').checked,
-        chartPeriod: document.getElementById('chartPeriod').value
+        chartPeriod: document.getElementById('chartPeriod').value,
+        currentTab: window.appState.currentTab,
+        hideCurve: window.appState.hideCurve
     };
     localStorage.setItem('appSettings', JSON.stringify(settings));
 }
@@ -292,6 +294,17 @@ function loadSettings() {
         if (settings.filterStatus) document.getElementById('filterStatus').value = settings.filterStatus;
         if (settings.autoCategorize !== undefined) document.getElementById('autoCategorize').checked = settings.autoCategorize;
         if (settings.chartPeriod) document.getElementById('chartPeriod').value = settings.chartPeriod;
+        
+        // Restore State
+        if (settings.currentTab) {
+            window.appState.currentTab = settings.currentTab;
+            // Update UI tab appearance
+            switchTab(settings.currentTab);
+        }
+        if (settings.hideCurve !== undefined) {
+            window.appState.hideCurve = settings.hideCurve;
+            document.getElementById('toggleBtn').textContent = window.appState.hideCurve ? "Mostrar Curve Cash" : "Ocultar Curve Cash";
+        }
     }
 }
 

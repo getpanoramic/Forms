@@ -343,12 +343,14 @@ function switchTab(tab) {
     }
     
     renderTable();
+    saveSettings(); // Save state on change
 }
 
 function toggleCurve() {
   window.appState.hideCurve = !window.appState.hideCurve;
   document.getElementById('toggleBtn').textContent = window.appState.hideCurve ? "Mostrar Curve Cash" : "Ocultar Curve Cash";
   renderTable();
+  saveSettings(); // Save state on change
 }
 
 // --- Bulk Actions ---

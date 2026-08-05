@@ -31,6 +31,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Network-first for HTML files
+  if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
   if (event.request.method === 'POST' && event.request.url.includes('/Forms/')) {
     event.respondWith((async () => {
       try {

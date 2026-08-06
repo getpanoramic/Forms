@@ -32,26 +32,21 @@ export async function parseT212Pdf(file, onProgress) {
     }
 
     const rows = [];
-    
-    // T212 Logic: Look for lines that look like transactions
-    // Assuming format based on Trading212 Activity statement
-    // Date | Time | Instrument | Action | Details | Amount | Currency
-    // 2026-07-01 | 09:00 | AAPL | Buy | ... | 100.00 | EUR
-    
-    // Simple regex to detect likely date start
-    const dateRegex = /^\d{4}-\d{2}-\d{2}/;
+
+    // Improved T212 Regex:
+    // Matches lines starting with YYYY-MM-DD
+    // Example line: 2026-07-01 15:30:00 AAPL Buy 1.000 100.00 EUR
+    const lineRegex = /^(\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}:\d{2}\s+(.+?)\s+(Buy|Sell|Dividend)\s+.*?\s+(-?[\d\.]+)\s+([A-Z]{3})/;
 
     lines.forEach(line => {
-        if (dateRegex.test(line)) {
-            const parts = line.split(/\s{2,}/); // Split by multiple spaces
-            if (parts.length >= 5) {
-                rows.push({
-                    date: parts[0],
-                    merchant: parts[2] + ' ' + parts[4], // Instrument + Details
-                    amount: parseFloat(parts[5].replace(',', '.')),
-                    source: 't212'
-                });
-            }
+        const match = line.match(lineRegex);
+        if (match) {
+            rows.push({
+                date: match[1],
+                merchant: `${match[2]} (${match[3]})`,
+                amount: parseFloat(match[4]),
+                source: 't212'
+            });
         }
     });
     

@@ -48,6 +48,12 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
         📄 Importar PDF
         <input type="file" id="pdfFileInput" accept=".pdf" class="hidden">
       </label>
+      
+      <!-- T212 PDF Upload -->
+      <label id="t212UploadBtn" class="hidden-section bg-purple-500 hover:bg-purple-600 text-white font-black px-6 py-3 rounded-lg uppercase text-xs tracking-widest cursor-pointer shadow-md transition-all">
+        📈 Importar T212 PDF
+        <input type="file" id="t212FileInput" accept=".pdf" class="hidden">
+      </label>
     </div>
   </div>
   
@@ -55,6 +61,7 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
   <div class="flex gap-4 border-b border-gray-200">
       <button onclick="switchTab('csv')" id="tabCurve" class="pb-2 border-b-2 tab-active font-bold text-sm">Dashboard Curve</button>
       <button onclick="switchTab('pdf')" id="tabBank" class="pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700">Extracto Bancário (PDF)</button>
+      <button onclick="switchTab('t212')" id="tabT212" class="pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700">Trading212 (PDF)</button>
   </div>
 </div>
 
@@ -176,6 +183,7 @@ import { supabase, fetchUserTransactions, subscribeToTransactions } from './js/s
 import { saveTransactions, getAllTransactions } from './js/db.js';
 import { initCharts } from './js/charts.js';
 import { parsePdf } from './js/pdfParser.js';
+import { parseT212Pdf } from './js/t212Parser.js';
 
 console.log('DEBUG: Module script starting...');
 
@@ -283,6 +291,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (pdfInput) {
     pdfInput.onchange = (e) => parseAndRenderPdf(e.target.files[0]);
   }
+  
+  const t212Input = document.getElementById('t212FileInput');
+  if (t212Input) {
+    t212Input.onchange = (e) => parseAndRenderT212Pdf(e.target.files[0]);
+  }
 });
 
 function toggleSection(id) { document.getElementById(id).classList.toggle('hidden-section'); }
@@ -334,19 +347,32 @@ function switchTab(tab, shouldRender = true) {
     // Update active tab styles
     const tabCurve = document.getElementById('tabCurve');
     const tabBank = document.getElementById('tabBank');
+    const tabT212 = document.getElementById('tabT212');
     const csvUploadBtn = document.getElementById('csvUploadBtn');
     const pdfUploadBtn = document.getElementById('pdfUploadBtn');
+    const t212UploadBtn = document.getElementById('t212UploadBtn');
     
     if (tab === 'csv') {
         tabCurve.className = "pb-2 border-b-2 tab-active font-bold text-sm";
         tabBank.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
+        tabT212.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
         csvUploadBtn.classList.remove('hidden-section');
         pdfUploadBtn.classList.add('hidden-section');
-    } else {
+        t212UploadBtn.classList.add('hidden-section');
+    } else if (tab === 'pdf') {
         tabCurve.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
         tabBank.className = "pb-2 border-b-2 tab-active font-bold text-sm";
+        tabT212.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
         csvUploadBtn.classList.add('hidden-section');
         pdfUploadBtn.classList.remove('hidden-section');
+        t212UploadBtn.classList.add('hidden-section');
+    } else {
+        tabCurve.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
+        tabBank.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
+        tabT212.className = "pb-2 border-b-2 tab-active font-bold text-sm";
+        csvUploadBtn.classList.add('hidden-section');
+        pdfUploadBtn.classList.add('hidden-section');
+        t212UploadBtn.classList.remove('hidden-section');
     }
     
     if (shouldRender) renderTable();
@@ -665,6 +691,36 @@ async function parseAndRenderPdf(file) {
     } catch (err) {
         console.error('DEBUG: PDF parse error:', err);
         showToast('Erro no processamento do PDF: ' + err.message, 'error');
+    }
+    setLoading(false);
+}
+
+async function parseAndRenderT212Pdf(file) {
+    console.log('DEBUG: parseAndRenderT212Pdf started for:', file.name);
+    if (!file) return;
+    setLoading(true, 'A iniciar T212...');
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const userId = user ? user.id : 'anonymous';
+        
+        const parsedRows = await parseT212Pdf(file, (msg) => setLoading(true, msg));
+        
+        const finalRows = parsedRows.map(row => ({
+            ...row,
+            id: generateStableId({user_id: userId, ...row}),
+            user_id: userId,
+            category: 'Investimentos',
+            submitted: false,
+            source: 't212'
+        }));
+        
+        await saveTransactions(finalRows);
+        window.appState.rawData = await fetchUserTransactions();
+        renderTable();
+        showToast('T212 PDF processado!', 'success');
+    } catch (err) {
+        console.error('T212 parse error:', err);
+        showToast('Erro T212: ' + err.message, 'error');
     }
     setLoading(false);
 }

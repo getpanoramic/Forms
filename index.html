@@ -824,6 +824,9 @@ function renderTable(page = 1) {
       
       chartFiltered = filtered.filter(t => new Date(t.date) >= limitDate);
       console.log('DEBUG: renderTable, chartFiltered length after date filter:', chartFiltered.length, 'limitDate:', limitDate);
+      if (chartFiltered.length === 0 && filtered.length > 0) {
+          console.log('DEBUG: First filtered item date example:', filtered[0].date);
+      }
   }
   
   initCharts(chartFiltered);

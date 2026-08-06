@@ -54,6 +54,12 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
         📈 Importar T212 PDF
         <input type="file" id="t212FileInput" accept=".pdf" class="hidden">
       </label>
+      
+      <!-- Salary PDF Upload -->
+      <label id="salaryUploadBtn" class="hidden-section bg-sky-500 hover:bg-sky-600 text-white font-black px-6 py-3 rounded-lg uppercase text-xs tracking-widest cursor-pointer shadow-md transition-all">
+        💰 Importar Recibo
+        <input type="file" id="salaryFileInput" accept=".pdf" class="hidden">
+      </label>
     </div>
   </div>
   
@@ -62,6 +68,7 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
       <button onclick="switchTab('csv')" id="tabCurve" class="pb-2 border-b-2 tab-active font-bold text-sm">Dashboard Curve</button>
       <button onclick="switchTab('pdf')" id="tabBank" class="pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700">Extracto Bancário (PDF)</button>
       <button onclick="switchTab('t212')" id="tabT212" class="pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700">Trading212 (PDF)</button>
+      <button onclick="switchTab('salary')" id="tabSalary" class="pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700">Vencimentos</button>
   </div>
 </div>
 
@@ -184,6 +191,7 @@ import { saveTransactions, getAllTransactions } from './js/db.js';
 import { initCharts } from './js/charts.js';
 import { parsePdf } from './js/pdfParser.js';
 import { parseT212Pdf } from './js/t212Parser.js';
+import { parseSalaryPdf } from './js/salaryParser.js';
 
 console.log('DEBUG: Module script starting...');
 
@@ -295,6 +303,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const t212Input = document.getElementById('t212FileInput');
   if (t212Input) {
     t212Input.onchange = (e) => parseAndRenderT212Pdf(e.target.files[0]);
+  }
+  
+  const salaryInput = document.getElementById('salaryFileInput');
+  if (salaryInput) {
+    salaryInput.onchange = (e) => parseAndRenderSalaryPdf(e.target.files[0]);
   }
 });
 
@@ -721,6 +734,36 @@ async function parseAndRenderT212Pdf(file) {
     } catch (err) {
         console.error('T212 parse error:', err);
         showToast('Erro T212: ' + err.message, 'error');
+    }
+    setLoading(false);
+}
+
+async function parseAndRenderSalaryPdf(file) {
+    console.log('DEBUG: parseAndRenderSalaryPdf started');
+    if (!file) return;
+    setLoading(true, 'A iniciar Recibo...');
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const userId = user ? user.id : 'anonymous';
+        
+        const parsedRows = await parseSalaryPdf(file, (msg) => setLoading(true, msg));
+        
+        const finalRows = parsedRows.map(row => ({
+            ...row,
+            id: generateStableId({user_id: userId, ...row}),
+            user_id: userId,
+            category: 'Salário',
+            submitted: true, // Salaries are typically already "submitted" to the bank
+            source: 'salary'
+        }));
+        
+        await saveTransactions(finalRows);
+        window.appState.rawData = await fetchUserTransactions();
+        renderTable();
+        showToast('Recibo processado!', 'success');
+    } catch (err) {
+        console.error('Salary parse error:', err);
+        showToast('Erro Recibo: ' + err.message, 'error');
     }
     setLoading(false);
 }

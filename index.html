@@ -249,6 +249,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // In DOMContentLoaded, fetch from Supabase
   setLoading(true);
+  
+  // Ensure settings are loaded first to set correct tab
+  loadSettings();
+  
   const { data: { session } } = await supabase.auth.getSession();
   console.log('DEBUG: Session found:', !!session);
   
@@ -276,19 +280,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   console.log('DEBUG: Final rawData length before render:', window.appState.rawData ? window.appState.rawData.length : 'NULL');
-  if (window.appState.rawData && window.appState.rawData.length > 0) {
-      renderTable();
-  } else {
-      console.warn('DEBUG: No data to render.');
-  }
-
-  // Re-apply tab after potential render
-  if (savedSettings && savedSettings.currentTab) {
-      console.log('DEBUG: DOMContentLoaded, re-applying tab (with delay):', savedSettings.currentTab);
-      setTimeout(() => {
-          switchTab(savedSettings.currentTab, true);
-      }, 100);
-  }
+  
+  // Render after settings loaded and data fetched
+  renderTable();
 
   setLoading(false);
 

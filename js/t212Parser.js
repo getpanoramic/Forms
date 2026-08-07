@@ -37,22 +37,19 @@ export async function parseT212Pdf(file, onProgress) {
     const rows = [];
     
     // Trading212 statements have a specific date format: YYYY-MM-DD
-    // Example transaction line structure:
-    // 2026-07-01 15:30:00 Instrument Action Details Amount Currency
-    const lineRegex = /^(\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}:\d{2}\s+(.+?)\s+(Buy|Sell|Dividend)\s+(.+?)\s+(-?[\d\.]+)\s+([A-Z]{3})/;
+    // Flexible regex to handle potential extra spaces and new action types
+    const lineRegex = /\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(.+?)\s+(Buy|Sell|Dividend|Deposit|Withdrawal)\s+(.+?)\s+(-?[\d\.]+)\s+([A-Z]{3})/;
 
     lines.forEach(line => {
-        // Log all date-starting lines to inspect format
-        if (line.match(/^\d{4}-\d{2}-\d{2}/)) {
-            console.log('DEBUG: Line starting with date:', line);
-        }
+        // Log all lines for debugging
+        console.log('DEBUG: Line structure:', line);
 
         const match = line.match(lineRegex);
         if (match) {
             console.log('DEBUG: Matched line:', line);
             rows.push({
                 date: match[1],
-                merchant: `${match[2]} (${match[3]})`,
+                merchant: `${match[3]} (${match[4]})`, // Instrument + Action
                 amount: parseFloat(match[5].replace(',', '.')),
                 source: 't212'
             });

@@ -31,22 +31,31 @@ export async function parseT212Pdf(file, onProgress) {
         });
     }
 
-    const rows = [];
+    console.log('T212 Lines extracted:', lines.length);
+    console.log('DEBUG: Sample lines:', lines.slice(0, 20));
 
+    const rows = [];
     // Improved T212 Regex:
     // Matches lines starting with YYYY-MM-DD
-    // Example line: 2026-07-01 15:30:00 AAPL Buy 1.000 100.00 EUR
+    // Trading212 often has spaces inside the numbers or different formats.
+    // Example: 2026-07-01 15:30:00 AAPL Buy 1.000 100.00 EUR
     const lineRegex = /^(\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}:\d{2}\s+(.+?)\s+(Buy|Sell|Dividend)\s+.*?\s+(-?[\d\.]+)\s+([A-Z]{3})/;
 
     lines.forEach(line => {
         const match = line.match(lineRegex);
         if (match) {
+            console.log('DEBUG: Matched line:', line);
             rows.push({
                 date: match[1],
                 merchant: `${match[2]} (${match[3]})`,
                 amount: parseFloat(match[4]),
                 source: 't212'
             });
+        } else {
+             // Log why it didn't match
+             if (line.match(/^\d{4}-\d{2}-\d{2}/)) {
+                console.log('DEBUG: Date line did not match full regex:', line);
+             }
         }
     });
     

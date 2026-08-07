@@ -2,13 +2,13 @@ import { supabase } from './supabase.js';
 
 export async function saveTransactions(transactions) {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    console.log('DEBUG: No user, skipping save.');
+  if (!user || transactions.length === 0) {
+    console.log('DEBUG: No user or no transactions to save, skipping save.');
     return;
   }
 
   // Determine source based on the first transaction, defaulting to 'csv'
-  const source = transactions.length > 0 ? (transactions[0].source || 'csv') : 'csv';
+  const source = transactions[0].source || 'csv';
   console.log(`DEBUG: Deleting existing '${source}' transactions for user: ${user.id}`);
   
   // Refined deletion: Only delete transactions of the same source
@@ -30,7 +30,7 @@ export async function saveTransactions(transactions) {
     category: t.csvCategory || t.category || 'Diversos',
     submitted: !!t.submitted,
     source: t.source || 'csv',
-    type: t.type // <-- Include the new type field
+    type: t.type
   }));
   
   console.log(`DEBUG: Inserting ${transactionsToUpload.length} transactions as '${source}'.`);

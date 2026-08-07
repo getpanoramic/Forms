@@ -37,20 +37,35 @@ export async function parseT212Pdf(file, onProgress) {
     const rows = [];
     
     // Trading212 statements have a specific date format: YYYY-MM-DD
-    // Flexible regex to handle potential extra spaces and new action types
-    const lineRegex = /\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(.+?)\s+(Buy|Sell|Dividend|Deposit|Withdrawal)\s+(.+?)\s+(-?[\d\.]+)\s+([A-Z]{3})/;
+    // Pattern 1: Executed Trades
+    const tradeRegex = /\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(.+?)\s+(Buy|Sell|Dividend|Deposit|Withdrawal)\s+(.+?)\s+(-?[\d\.]+)\s+([A-Z]{3})/;
+    // Pattern 2: Transactions & Dividends
+    // Format Example: 2026-07-01 01:02:33 Interest on cash €0.04
+    const transRegex = /\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(.+?)\s+([€$£][\d\.,-]+)/;
 
     lines.forEach(line => {
         // Log all lines for debugging
-        console.log('DEBUG: Line structure:', line);
+        // console.log('DEBUG: Line structure:', line);
 
-        const match = line.match(lineRegex);
-        if (match) {
-            console.log('DEBUG: Matched line:', line);
+        const tradeMatch = line.match(tradeRegex);
+        const transMatch = line.match(transRegex);
+
+        if (tradeMatch) {
+            console.log('DEBUG: Matched trade line:', line);
             rows.push({
-                date: match[1],
-                merchant: `${match[3]} (${match[4]})`, // Instrument + Action
-                amount: parseFloat(match[5].replace(',', '.')),
+                date: tradeMatch[1],
+                merchant: `${tradeMatch[3]} (${tradeMatch[4]})`, // Instrument + Action
+                amount: parseFloat(tradeMatch[5].replace(',', '.')),
+                source: 't212'
+            });
+        } else if (transMatch) {
+            console.log('DEBUG: Matched transaction line:', line);
+            // Amount might contain currency symbol, need to strip it
+            const amountStr = transMatch[4].replace(/[€$£]/, '').replace(',', '.');
+            rows.push({
+                date: transMatch[1],
+                merchant: transMatch[3].trim(),
+                amount: parseFloat(amountStr),
                 source: 't212'
             });
         }

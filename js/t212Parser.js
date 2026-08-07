@@ -38,7 +38,10 @@ export async function parseT212Pdf(file, onProgress) {
     
     // Trading212 statements have a specific date format: YYYY-MM-DD
     // Pattern 1: Executed Trades
-    const tradeRegex = /\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(.+?)\s+(Buy|Sell|Dividend|Deposit|Withdrawal)\s+(.+?)\s+(-?[\d\.]+)\s+([A-Z]{3})/;
+    // Line Example: 2026-07-01 13:30:00   WM   US94106L1098   53508642386   Buy   0.00647776   $225   $1.4575   Market   OTC   Regular hours   1.13866875   -   -   -   €1.28
+    // Regex needs to skip a variable number of columns to get the final EUR value at the end.
+    const tradeRegex = /^\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(.+?)\s+.+?\s+(Buy|Sell|Dividend|Deposit|Withdrawal)\s+.+?€([\d\.,]+)$/;
+
     // Pattern 2: Transactions & Dividends
     // Format Example: 2026-07-01 01:02:33 Interest on cash €0.04
     const transRegex = /\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(.+?)\s+([€$£][\d\.,-]+)/;
@@ -52,6 +55,7 @@ export async function parseT212Pdf(file, onProgress) {
 
         if (tradeMatch) {
             console.log('DEBUG: Matched trade line:', line);
+            // tradeMatch: 1=date, 2=time, 3=instrument, 4=action, 5=EUR amount
             rows.push({
                 date: tradeMatch[1],
                 merchant: `${tradeMatch[3]} (${tradeMatch[4]})`, // Instrument + Action

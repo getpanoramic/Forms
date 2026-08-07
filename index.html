@@ -791,17 +791,33 @@ function renderTable(page = 1) {
     
     // DEBUG:
     if (rowSource !== window.appState.currentTab) {
-        // console.log(`DEBUG: Filtering out row because source mismatch: ${rowSource} !== ${window.appState.currentTab}`, row);
+        // Only log a few to avoid spam
+        if (Math.random() < 0.1) console.log(`DEBUG: Filtering out row: source mismatch. Row: ${rowSource}, Current: ${window.appState.currentTab}`, row);
         return false;
     }
     
-    if (window.appState.hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
-    if (start && row.date < start) return false;
-    if (end && row.date > end) return false;
+    if (window.appState.hideCurve && row.merchant.toLowerCase().includes("curve cash")) {
+        console.log('DEBUG: Filtering out row: hideCurve is active', row);
+        return false;
+    }
+    if (start && row.date < start) {
+        console.log(`DEBUG: Filtering out row: date < start (${row.date} < ${start})`, row);
+        return false;
+    }
+    if (end && row.date > end) {
+        console.log(`DEBUG: Filtering out row: date > end (${row.date} > ${end})`, row);
+        return false;
+    }
     
     const isSubmitted = !!row.submitted;
-    if (statusFilter === 'Pending' && isSubmitted) return false;
-    if (statusFilter === 'Submitted' && !isSubmitted) return false;
+    if (statusFilter === 'Pending' && isSubmitted) {
+        console.log('DEBUG: Filtering out row: status Pending mismatch', row);
+        return false;
+    }
+    if (statusFilter === 'Submitted' && !isSubmitted) {
+        console.log('DEBUG: Filtering out row: status Submitted mismatch', row);
+        return false;
+    }
     
     return true;
   });

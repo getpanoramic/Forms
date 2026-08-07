@@ -788,7 +788,12 @@ function renderTable(page = 1) {
   let filtered = uniqueData.filter(row => {
     // Tab filtering: Only show records from the correct source
     const rowSource = row.source || 'csv';
-    if (rowSource !== window.appState.currentTab) return false;
+    
+    // DEBUG:
+    if (rowSource !== window.appState.currentTab) {
+        // console.log(`DEBUG: Filtering out row because source mismatch: ${rowSource} !== ${window.appState.currentTab}`, row);
+        return false;
+    }
     
     if (window.appState.hideCurve && row.merchant.toLowerCase().includes("curve cash")) return false;
     if (start && row.date < start) return false;

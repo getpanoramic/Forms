@@ -33,7 +33,6 @@ export async function parseT212Pdf(file, onProgress) {
     }
 
     console.log('T212 Lines extracted:', lines.length);
-    // console.log('DEBUG: Sample lines:', lines.slice(0, 50));
 
     const rows = [];
     
@@ -43,8 +42,14 @@ export async function parseT212Pdf(file, onProgress) {
     const lineRegex = /^(\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}:\d{2}\s+(.+?)\s+(Buy|Sell|Dividend)\s+(.+?)\s+(-?[\d\.]+)\s+([A-Z]{3})/;
 
     lines.forEach(line => {
+        // Log all date-starting lines to inspect format
+        if (line.match(/^\d{4}-\d{2}-\d{2}/)) {
+            console.log('DEBUG: Line starting with date:', line);
+        }
+
         const match = line.match(lineRegex);
         if (match) {
+            console.log('DEBUG: Matched line:', line);
             rows.push({
                 date: match[1],
                 merchant: `${match[2]} (${match[3]})`,

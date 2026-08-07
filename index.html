@@ -284,8 +284,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Re-apply tab after potential render
   if (savedSettings && savedSettings.currentTab) {
-      console.log('DEBUG: DOMContentLoaded, re-applying tab:', savedSettings.currentTab);
-      switchTab(savedSettings.currentTab, true);
+      console.log('DEBUG: DOMContentLoaded, re-applying tab (with delay):', savedSettings.currentTab);
+      setTimeout(() => {
+          switchTab(savedSettings.currentTab, true);
+      }, 100);
   }
 
   setLoading(false);

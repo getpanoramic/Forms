@@ -351,37 +351,35 @@ function loadSettings() {
 }
 
 function switchTab(tab, shouldRender = true) {
+    console.log(`DEBUG: switchTab called with tab: ${tab}`);
     window.appState.currentTab = tab;
     
     // Update active tab styles
     const tabCurve = document.getElementById('tabCurve');
     const tabBank = document.getElementById('tabBank');
     const tabT212 = document.getElementById('tabT212');
+    const tabSalary = document.getElementById('tabSalary');
     const csvUploadBtn = document.getElementById('csvUploadBtn');
     const pdfUploadBtn = document.getElementById('pdfUploadBtn');
     const t212UploadBtn = document.getElementById('t212UploadBtn');
+    const salaryUploadBtn = document.getElementById('salaryUploadBtn');
+    
+    // Reset all tabs
+    [tabCurve, tabBank, tabT212, tabSalary].forEach(t => t.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700");
+    [csvUploadBtn, pdfUploadBtn, t212UploadBtn, salaryUploadBtn].forEach(b => b.classList.add('hidden-section'));
     
     if (tab === 'csv') {
         tabCurve.className = "pb-2 border-b-2 tab-active font-bold text-sm";
-        tabBank.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
-        tabT212.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
         csvUploadBtn.classList.remove('hidden-section');
-        pdfUploadBtn.classList.add('hidden-section');
-        t212UploadBtn.classList.add('hidden-section');
     } else if (tab === 'pdf') {
-        tabCurve.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
         tabBank.className = "pb-2 border-b-2 tab-active font-bold text-sm";
-        tabT212.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
-        csvUploadBtn.classList.add('hidden-section');
         pdfUploadBtn.classList.remove('hidden-section');
-        t212UploadBtn.classList.add('hidden-section');
-    } else {
-        tabCurve.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
-        tabBank.className = "pb-2 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700";
+    } else if (tab === 't212') {
         tabT212.className = "pb-2 border-b-2 tab-active font-bold text-sm";
-        csvUploadBtn.classList.add('hidden-section');
-        pdfUploadBtn.classList.add('hidden-section');
         t212UploadBtn.classList.remove('hidden-section');
+    } else if (tab === 'salary') {
+        tabSalary.className = "pb-2 border-b-2 tab-active font-bold text-sm";
+        salaryUploadBtn.classList.remove('hidden-section');
     }
     
     if (shouldRender) renderTable();
@@ -725,7 +723,10 @@ async function parseAndRenderT212Pdf(file) {
         
         await saveTransactions(finalRows);
         window.appState.rawData = await fetchUserTransactions();
-        renderTable();
+        
+        // AUTOMATICALLY SWITCH TAB
+        switchTab('t212', true);
+        
         showToast('T212 PDF processado!', 'success');
     } catch (err) {
         console.error('T212 parse error:', err);

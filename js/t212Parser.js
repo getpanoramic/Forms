@@ -1,6 +1,6 @@
 // Trading212 PDF Parser
-// Expected structure:
-// Typically lines with Date, Time, Instrument, Action, Details, Amount, Currency
+// Structured for: Trading 212 Activity Statements
+// Format: Date | Time | Instrument | Action | Details | Amount | Currency
 
 export async function parseT212Pdf(file, onProgress) {
     if (onProgress) onProgress('A processar T212 PDF...');
@@ -13,7 +13,8 @@ export async function parseT212Pdf(file, onProgress) {
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
         
-        // Group items by their vertical position
+        // Items are usually structured with a transform matrix.
+        // We need to group them by Y-coordinate to form lines.
         const items = content.items;
         const lineGroups = {};
         
@@ -32,30 +33,24 @@ export async function parseT212Pdf(file, onProgress) {
     }
 
     console.log('T212 Lines extracted:', lines.length);
-    console.log('DEBUG: Sample lines:', lines.slice(0, 20));
+    // console.log('DEBUG: Sample lines:', lines.slice(0, 50));
 
     const rows = [];
-    // Improved T212 Regex:
-    // Matches lines starting with YYYY-MM-DD
-    // Trading212 often has spaces inside the numbers or different formats.
-    // Example: 2026-07-01 15:30:00 AAPL Buy 1.000 100.00 EUR
-    const lineRegex = /^(\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}:\d{2}\s+(.+?)\s+(Buy|Sell|Dividend)\s+.*?\s+(-?[\d\.]+)\s+([A-Z]{3})/;
+    
+    // Trading212 statements have a specific date format: YYYY-MM-DD
+    // Example transaction line structure:
+    // 2026-07-01 15:30:00 Instrument Action Details Amount Currency
+    const lineRegex = /^(\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}:\d{2}\s+(.+?)\s+(Buy|Sell|Dividend)\s+(.+?)\s+(-?[\d\.]+)\s+([A-Z]{3})/;
 
     lines.forEach(line => {
         const match = line.match(lineRegex);
         if (match) {
-            console.log('DEBUG: Matched line:', line);
             rows.push({
                 date: match[1],
                 merchant: `${match[2]} (${match[3]})`,
-                amount: parseFloat(match[4]),
+                amount: parseFloat(match[5].replace(',', '.')),
                 source: 't212'
             });
-        } else {
-             // Log why it didn't match
-             if (line.match(/^\d{4}-\d{2}-\d{2}/)) {
-                console.log('DEBUG: Date line did not match full regex:', line);
-             }
         }
     });
     

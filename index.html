@@ -317,7 +317,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-function toggleSection(id) { document.getElementById(id).classList.toggle('hidden-section'); }
+function toggleSection(id) { 
+    console.log(`DEBUG: toggleSection called for ID: ${id}`);
+    const el = document.getElementById(id);
+    if (el) {
+        if (el.style.display === 'none') {
+            el.style.display = '';
+            console.log(`DEBUG: Element displayed.`);
+        } else {
+            el.style.display = 'none';
+            console.log(`DEBUG: Element hidden.`);
+        }
+    } else {
+        console.error(`DEBUG: Element with ID '${id}' not found!`);
+    }
+}
 
 // --- Persistence Logic ---
 function saveSettings() {

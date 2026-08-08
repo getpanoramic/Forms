@@ -130,23 +130,33 @@ body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
 </div>
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-  <div class="bg-white card p-6">
-    <h3 class="text-xs font-black text-gray-400 uppercase mb-4">Despesas por Categoria</h3>
-    <canvas id="chartCategory"></canvas>
+  <!-- Added toggle button -->
+  <div class="md:col-span-2 flex justify-end">
+    <button onclick="toggleSection('graphicsSection')" class="text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
+      👁️ Mostrar/Esconder Gráficos
+    </button>
   </div>
-  <div class="bg-white card p-6">
-    <div class="flex justify-between items-center mb-4">
-        <h3 class="text-xs font-black text-gray-400 uppercase">Evolução de Gastos (EUR)</h3>
-        <select id="chartPeriod" onchange="renderTable(); saveSettings();" class="text-xs p-1 border rounded-lg font-bold">
-            <option value="1d">1 Dia</option>
-            <option value="1w">1 Semana</option>
-            <option value="1m" selected>1 Mês</option>
-            <option value="3m">3 Meses</option>
-            <option value="all">Tudo</option>
-        </select>
+  
+  <div id="graphicsSection" class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="bg-white card p-6">
+      <h3 class="text-xs font-black text-gray-400 uppercase mb-4">Despesas por Categoria</h3>
+      <canvas id="chartCategory"></canvas>
     </div>
-    <canvas id="chartTime"></canvas>
+    <div class="bg-white card p-6">
+      <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xs font-black text-gray-400 uppercase">Evolução de Gastos (EUR)</h3>
+          <select id="chartPeriod" onchange="renderTable(); saveSettings();" class="text-xs p-1 border rounded-lg font-bold">
+              <option value="1d">1 Dia</option>
+              <option value="1w">1 Semana</option>
+              <option value="1m" selected>1 Mês</option>
+              <option value="3m">3 Meses</option>
+              <option value="all">Tudo</option>
+          </select>
+      </div>
+      <canvas id="chartTime"></canvas>
+    </div>
   </div>
+  
   <div class="md:col-span-2 flex gap-2" id="quickFilters">
       <span class="text-[10px] font-black uppercase text-gray-400 self-center">Filtros Rápidos:</span>
   </div>

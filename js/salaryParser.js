@@ -18,21 +18,26 @@ export async function parseSalaryPdf(file, onProgress) {
     const fullText = lines.join(' ');
     console.log('DEBUG: Full PDF text content for analysis:', fullText);
 
-    // Helper to extract values
+    // Helper to extract values - specifically the first number after label
     const parseNumber = (str) => {
         if (!str) return 0;
-        return parseFloat(str.replace(/\s/g, '').replace(',', '.'));
+        // Clean up: Replace spaces with nothing (thousands separator)
+        // Replace comma with dot (decimal separator)
+        // Handle "1 995,50" -> 1995.50
+        const cleaned = str.trim().replace(/\s/g, '').replace(',', '.');
+        return parseFloat(cleaned);
     };
 
-    // Regex patterns updated to be more robust
-    const dateMatch = fullText.match(/RECIBO DE REMUNERAÇÕES - .* DE (\d{4})/);
-    // Looking at the text: "Total Ilíquido 1 995,50 Total Descontos 310,19 Total a Receber 1 685,31"
-    const grossMatch = fullText.match(/Total Ilíquido\s+([\d\s,]+)/);
-    const irsMatch = fullText.match(/Desc\. IRS Colaborador\s+([\d\s,]+)/);
-    const ssMatch = fullText.match(/Desc\. SS Colaborador\s+([\d\s,]+)/);
-    const netMatch = fullText.match(/Total a Receber\s+([\d\s,]+)/);
+    // Regex patterns updated: Use [^0-9]+ to stop at the first non-numeric part of the value
+    // Target the first number after label.
+    // Example: "Total Ilíquido 1 995,50 Total Descontos..."
+    const grossMatch = fullText.match(/Total Ilíquido\s+([\d\s]+,\d+)/);
+    const irsMatch = fullText.match(/Desc\. IRS Colaborador\s+([\d\s]+,\d+)/);
+    const ssMatch = fullText.match(/Desc\. SS Colaborador\s+([\d\s]+,\d+)/);
+    const netMatch = fullText.match(/Total a Receber\s+([\d\s]+,\d+)/);
 
-    const year = dateMatch ? dateMatch[1] : new Date().getFullYear();
+    const yearMatch = fullText.match(/RECIBO DE REMUNERAÇÕES - .* DE (\d{4})/);
+    const year = yearMatch ? yearMatch[1] : new Date().getFullYear();
     
     // Extract values
     const gross = grossMatch ? parseNumber(grossMatch[1]) : 0;

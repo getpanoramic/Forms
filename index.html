@@ -378,6 +378,17 @@ function switchTab(tab, shouldRender = true) {
     console.log(`DEBUG: switchTab called with tab: ${tab}`);
     window.appState.currentTab = tab;
     
+    // Reset table header to original state
+    const header = document.querySelector('thead tr');
+    header.innerHTML = `
+        <th class="p-4"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
+        <th class="p-4 text-[10px] font-black text-gray-400 uppercase cursor-pointer" onclick="sortTable('date')">Data ↕️</th>
+        <th class="p-4 text-[10px] font-black text-gray-400 uppercase cursor-pointer" onclick="sortTable('merchant')">Merchant ↕️</th>
+        <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Valor</th>
+        <th class="p-4 text-[10px] font-black text-gray-400 uppercase">Categoria</th>
+        <th class="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Ação</th>
+    `;
+    
     // Update active tab styles
     const tabCurve = document.getElementById('tabCurve');
     const tabBank = document.getElementById('tabBank');
@@ -806,6 +817,14 @@ function renderTable(page = 1) {
   
   const body = document.getElementById('transactionsBody');
   body.innerHTML = '';
+  
+  // Handle Salary View Specially
+  if (window.appState.currentTab === 'salary') {
+      renderSalaryView(uniqueData);
+      return;
+  }
+
+  // --- Original Transaction Rendering Logic (for CSV/PDF/T212) ---
   const start = document.getElementById('filterStart').value;
   const end = document.getElementById('filterEnd').value;
   const statusFilter = document.getElementById('filterStatus').value;
@@ -971,6 +990,37 @@ function renderTable(page = 1) {
   }
   
   initCharts(chartFiltered);
+}
+
+// Add the specialized render function
+function renderSalaryView(allData) {
+    const body = document.getElementById('transactionsBody');
+    body.innerHTML = '';
+    
+    // Filter just salary
+    const salaryData = allData.filter(row => row.source === 'salary');
+    
+    // Header for Salary View
+    const header = document.querySelector('thead tr');
+    header.innerHTML = `
+        <th class="p-4 text-[10px] font-black text-gray-400 uppercase">Data</th>
+        <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Bruto</th>
+        <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">IRS</th>
+        <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Seg. Soc.</th>
+        <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Líquido</th>
+    `;
+    
+    salaryData.forEach(row => {
+        body.insertAdjacentHTML('beforeend', `
+            <tr class="hover:bg-gray-50">
+                <td class="p-4 text-xs font-bold text-gray-800">${row.date}</td>
+                <td class="p-4 text-right font-bold text-gray-800">${(row.gross || 0).toFixed(2)}€</td>
+                <td class="p-4 text-right font-bold text-rose-600">${(row.irs || 0).toFixed(2)}€</td>
+                <td class="p-4 text-right font-bold text-rose-600">${(row.ss || 0).toFixed(2)}€</td>
+                <td class="p-4 text-right font-bold text-emerald-600">${(row.amount || 0).toFixed(2)}€</td>
+            </tr>
+        `);
+    });
 }
 
 function sortTable(key) {

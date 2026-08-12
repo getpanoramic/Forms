@@ -15,25 +15,36 @@ export async function parseSalaryPdf(file, onProgress) {
         content.items.forEach(item => lines.push(item.str));
     }
 
-    // DEBUG: Dump full text
-    console.log('DEBUG: Full PDF text content:', lines.join(' '));
+    const fullText = lines.join(' ');
 
-    // Extract relevant data using regex or structural search
-    // Based on the provided example:
-    // "RECIBO DE REMUNERAÇÕES - JULHO DE 2026 (01/07/2026 a 31/07/2026)"
-    // "Total a Receber * 1685,31 13700,70"
+    // Helper to extract values
+    const extract = (regex) => {
+        const match = fullText.match(regex);
+        return match ? parseFloat(match[1].replace(/\s/g, '').replace(',', '.')) : 0;
+    };
 
-    let dateMatch = lines.join(' ').match(/RECIBO DE REMUNERAÇÕES - .* DE (\d{4}) \(.*\)/);
-    let totalMatch = lines.join(' ').match(/Total a Receber \*\s*([\d\s,]+)\s*([\d\s,]+)/);
-    
-    // Construct the date and amount
+    // Regex patterns based on extracted text
+    const dateMatch = fullText.match(/RECIBO DE REMUNERAÇÕES - .* DE (\d{4})/);
+    const grossMatch = fullText.match(/Total Ilíquido\s+([\d\s,]+)/);
+    const irsMatch = fullText.match(/IRS\s+\d+,\d+%\s+[\d\s,]+\s+([\d\s,]+)/);
+    const ssMatch = fullText.match(/Segurança Social\s+\d+,\d+%\s+[\d\s,]+\s+([\d\s,]+)/);
+    const netMatch = fullText.match(/Total a Receber\s+([\d\s,]+)/);
+
     const year = dateMatch ? dateMatch[1] : new Date().getFullYear();
-    const amount = totalMatch ? parseFloat(totalMatch[1].replace(/\s/g, '').replace(',', '.')) : 0;
+    
+    // Extract values
+    const gross = grossMatch ? parseFloat(grossMatch[1].replace(/\s/g, '').replace(',', '.')) : 0;
+    const irs = irsMatch ? parseFloat(irsMatch[1].replace(/\s/g, '').replace(',', '.')) : 0;
+    const ss = ssMatch ? parseFloat(ssMatch[1].replace(/\s/g, '').replace(',', '.')) : 0;
+    const net = netMatch ? parseFloat(netMatch[1].replace(/\s/g, '').replace(',', '.')) : 0;
     
     const rows = [{
-        date: `${year}-07-31`, // Placeholder, needs month extraction
+        date: `${year}-07-31`, // Simplified for now
         merchant: 'Vencimento',
-        amount: amount,
+        amount: net,
+        gross: gross,
+        irs: irs,
+        ss: ss,
         source: 'salary'
     }];
     

@@ -31,10 +31,15 @@ export async function saveTransactions(transactions) {
     submitted: !!t.submitted,
     source: t.source || 'csv',
     type: t.type,
-    // Include specific fields if they exist
+    // Include specific granular fields
     gross: t.gross || null,
     irs: t.irs || null,
-    ss: t.ss || null
+    ss: t.ss || null,
+    vencimento_base: t.vencimento_base || null,
+    cartao_vale_refeicao: t.cartao_vale_refeicao || null,
+    isencao_horario: t.isencao_horario || null,
+    seguro_saude: t.seguro_saude || null,
+    pagamento_vale_refeicao: t.pagamento_vale_refeicao || null
   }));
   
   console.log(`DEBUG: Inserting ${transactionsToUpload.length} transactions as '${source}'.`);

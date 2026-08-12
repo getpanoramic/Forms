@@ -19,7 +19,7 @@ export async function fetchUserTransactions(retries = 3, backoff = 1000) {
     
     const { data, error } = await supabase
       .from('transactions')
-      .select('id, user_id, date, merchant, amount, category, submitted, created_at, source, type, gross, irs, ss')
+      .select('id, user_id, date, merchant, amount, category, submitted, created_at, source, type, gross, irs, ss, vencimento_base, cartao_vale_refeicao, isencao_horario, seguro_saude, pagamento_vale_refeicao')
       .eq('user_id', user.id)
       .order('date', { ascending: false });
       

@@ -12,11 +12,28 @@ export async function parseSalaryPdf(file, onProgress) {
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
-        content.items.forEach(item => lines.push(item.str));
+        
+        // Group items by their vertical position (y coordinate) to reconstruct lines accurately
+        const items = content.items;
+        const lineGroups = {};
+        
+        items.forEach(item => {
+            const y = Math.round(item.transform[5]); // Vertical coordinate
+            if (!lineGroups[y]) lineGroups[y] = [];
+            lineGroups[y].push(item);
+        });
+        
+        // Sort lines vertically (top to bottom) and sort items horizontally (left to right)
+        const sortedY = Object.keys(lineGroups).sort((a, b) => b - a);
+        sortedY.forEach(y => {
+            const rowItems = lineGroups[y].sort((a, b) => a.transform[4] - b.transform[4]);
+            const lineText = rowItems.map(item => item.str).join(' ');
+            if (lineText.trim()) lines.push(lineText);
+        });
     }
 
-    const fullText = lines.join(' ');
-    console.log('DEBUG: Full PDF text content for analysis:', fullText);
+    const fullText = lines.join('\n');
+    console.log('DEBUG: Full PDF text content for analysis (with lines):', fullText);
 
     // Helper to extract values - specifically the first number after label
     const parseNumber = (str) => {
@@ -49,13 +66,83 @@ export async function parseSalaryPdf(file, onProgress) {
     
     console.log(`DEBUG: Extracted Salary Data: Gross=${gross}, IRS=${irs}, SS=${ss}, Net=${net}`);
 
+    const parseLineItems = (text, startKeyword, endKeyword) => {
+        const lines = text.split('\n');
+        const items = [];
+        let inSection = false;
+        
+        for (let line of lines) {
+            if (line.includes(startKeyword)) {
+                inSection = true;
+                continue;
+            }
+            if (line.includes(endKeyword)) {
+                inSection = false;
+                break;
+            }
+            
+            if (inSection && line.trim()) {
+                // Heuristic: Last two or three components are usually numeric
+                const parts = line.split(/\s{2,}/).filter(p => p.trim());
+                if (parts.length >= 2) {
+                    const name = parts[0].trim();
+                    const value = parseNumber(parts[parts.length - 1]);
+                    items.push({ name, value });
+                }
+            }
+        }
+        return items;
+    };
+
+    const parsePagamentos = (text) => {
+        const startMarker = "Tipo Transf. IBAN/Nº Cartão Refeição Valor Valor Extenso";
+        const endMarker = "Mês Acumulado";
+        const startIndex = text.indexOf(startMarker);
+        if (startIndex === -1) return [];
+        const endIndex = text.indexOf(endMarker, startIndex + startMarker.length);
+        if (endIndex === -1) return [];
+        
+        const section = text.substring(startIndex + startMarker.length, endIndex);
+        const lines = section.split('\n');
+        const items = [];
+        
+        for (let line of lines) {
+            if (!line.trim()) continue;
+            // Pattern: [Name] [Details/IBAN] [Amount] [Extended Amount]
+            const parts = line.split(/\s{2,}/).filter(p => p.trim());
+            if (parts.length >= 2) {
+                const name = parts[0].trim();
+                const amount = parseNumber(parts[parts.length - 2]); // Amount is usually second to last
+                items.push({ name, amount });
+            }
+        }
+        return items;
+    };
+
+    // Extract line items into specific variables
+    const getVal = (items, name) => {
+        const item = items.find(i => i.name.toLowerCase().includes(name.toLowerCase()));
+        return item ? item.value : 0;
+    };
+
+    const remuneracoes = parseLineItems(fullText, 'Remunerações', 'Desconto');
+    const descontos = parseLineItems(fullText, 'Desconto', 'Total Ilíquido');
+    const pagamentos = parsePagamentos(fullText);
+    
+    console.log(`DEBUG: Extracted Line Items: Remunerações=${remuneracoes.length}, Descontos=${descontos.length}, Pagamentos=${pagamentos.length}`);
+
     const rows = [{
         date: `${year}-07-31`, // Simplified for now
         merchant: 'Vencimento',
         amount: net,
         gross: gross,
-        irs: irs,
-        ss: ss,
+        irs: getVal(descontos, 'IRS'),
+        ss: getVal(descontos, 'Segurança Social'),
+        vencimento_base: getVal(remuneracoes, 'Vencimento Base'),
+        cartao_vale_refeicao: getVal(remuneracoes, 'Cartão/Vale Refeição'),
+        isencao_horario: getVal(remuneracoes, 'Isenção de Horário'),
+        seguro_saude: getVal(remuneracoes, 'Seguro de Saude'),
+        pagamento_vale_refeicao: getVal(pagamentos, 'Vale de Refeição'),
         source: 'salary'
     }];
     

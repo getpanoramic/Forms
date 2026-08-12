@@ -28,16 +28,20 @@ export async function parseSalaryPdf(file, onProgress) {
         return parseFloat(cleaned);
     };
 
-    // Regex patterns updated: Use [^0-9]+ to stop at the first non-numeric part of the value
-    // Target the first number after label.
-    // Example: "Total Ilíquido 1 995,50 Total Descontos..."
-    const grossMatch = fullText.match(/Total Ilíquido\s+([\d\s]+,\d+)/);
+    // Regex patterns updated to be more robust
+    const dateMatch = fullText.match(/RECIBO DE REMUNERAÇÕES - .* DE (\d{4})/);
+    
+    // Look for "Total Ilíquido" specifically followed by the value that precedes "Total Descontos"
+    const grossMatch = fullText.match(/Total Ilíquido\s+([\d\s]+,\d+)\s+Total Descontos/);
+    
+    // Specifically target the IRS and SS discounts
     const irsMatch = fullText.match(/Desc\. IRS Colaborador\s+([\d\s]+,\d+)/);
     const ssMatch = fullText.match(/Desc\. SS Colaborador\s+([\d\s]+,\d+)/);
-    const netMatch = fullText.match(/Total a Receber\s+([\d\s]+,\d+)/);
+    
+    // Specifically target the "Total a Receber" near the end
+    const netMatch = fullText.match(/Total a Receber\s+\*\s+([\d\s]+,\d+)\s+\d+\d+,\d+/);
 
-    const yearMatch = fullText.match(/RECIBO DE REMUNERAÇÕES - .* DE (\d{4})/);
-    const year = yearMatch ? yearMatch[1] : new Date().getFullYear();
+    const year = dateMatch ? dateMatch[1] : new Date().getFullYear();
     
     // Extract values
     const gross = grossMatch ? parseNumber(grossMatch[1]) : 0;

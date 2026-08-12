@@ -30,7 +30,11 @@ export async function saveTransactions(transactions) {
     category: t.csvCategory || t.category || 'Diversos',
     submitted: !!t.submitted,
     source: t.source || 'csv',
-    type: t.type
+    type: t.type,
+    // Include specific fields if they exist
+    gross: t.gross || null,
+    irs: t.irs || null,
+    ss: t.ss || null
   }));
   
   console.log(`DEBUG: Inserting ${transactionsToUpload.length} transactions as '${source}'.`);

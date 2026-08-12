@@ -15,6 +15,9 @@ export async function parseSalaryPdf(file, onProgress) {
         content.items.forEach(item => lines.push(item.str));
     }
 
+    // DEBUG: Dump full text
+    console.log('DEBUG: Full PDF text content:', lines.join(' '));
+
     // Extract relevant data using regex or structural search
     // Based on the provided example:
     // "RECIBO DE REMUNERAÇÕES - JULHO DE 2026 (01/07/2026 a 31/07/2026)"

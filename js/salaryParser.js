@@ -28,26 +28,24 @@ export async function parseSalaryPdf(file, onProgress) {
         return parseFloat(cleaned);
     };
 
+    const extractValueAfterKeyword = (text, keyword) => {
+        const index = text.indexOf(keyword);
+        if (index === -1) return 0;
+        const afterKeyword = text.substring(index + keyword.length);
+        const match = afterKeyword.match(/\s*([\d\s]+,\d+)/);
+        return match ? parseNumber(match[1]) : 0;
+    };
+
     // Regex patterns updated to be more robust
     const dateMatch = fullText.match(/RECIBO DE REMUNERAÇÕES - .* DE (\d{4})/);
     
-    // Look for "Total Ilíquido" specifically followed by the value that precedes "Total Descontos"
-    const grossMatch = fullText.match(/Total Ilíquido\s+([\d\s]+,\d+)\s+Total Descontos/);
-    
-    // Specifically target the IRS and SS discounts
-    const irsMatch = fullText.match(/Desc\. IRS Colaborador\s+([\d\s]+,\d+)/);
-    const ssMatch = fullText.match(/Desc\. SS Colaborador\s+([\d\s]+,\d+)/);
-    
-    // Specifically target the "Total a Receber" near the end
-    const netMatch = fullText.match(/Total a Receber\s+\*\s+([\d\s]+,\d+)\s+\d+\d+,\d+/);
-
     const year = dateMatch ? dateMatch[1] : new Date().getFullYear();
     
     // Extract values
-    const gross = grossMatch ? parseNumber(grossMatch[1]) : 0;
-    const irs = irsMatch ? parseNumber(irsMatch[1]) : 0;
-    const ss = ssMatch ? parseNumber(ssMatch[1]) : 0;
-    const net = netMatch ? parseNumber(netMatch[1]) : 0;
+    const gross = extractValueAfterKeyword(fullText, 'Total Ilíquido');
+    const irs = extractValueAfterKeyword(fullText, 'Desc. IRS Colaborador');
+    const ss = extractValueAfterKeyword(fullText, 'Desc. SS Colaborador');
+    const net = extractValueAfterKeyword(fullText, 'Total a Receber *');
     
     console.log(`DEBUG: Extracted Salary Data: Gross=${gross}, IRS=${irs}, SS=${ss}, Net=${net}`);
 

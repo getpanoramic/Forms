@@ -95,7 +95,8 @@ export async function parseSalaryPdf(file, onProgress) {
     };
 
     const parsePagamentos = (text) => {
-        const startMarker = "Tipo Transf. IBAN/Nº Cartão Refeição Valor Valor Extenso";
+        // Look for the "Tipo Transf." header, allowing for some flexibility in whitespace
+        const startMarker = "Tipo Transf.";
         const endMarker = "Mês Acumulado";
         const startIndex = text.indexOf(startMarker);
         if (startIndex === -1) return [];
@@ -108,12 +109,18 @@ export async function parseSalaryPdf(file, onProgress) {
         
         for (let line of lines) {
             if (!line.trim()) continue;
-            // Pattern: [Name] [Details/IBAN] [Amount] [Extended Amount]
-            const parts = line.split(/\s{2,}/).filter(p => p.trim());
-            if (parts.length >= 2) {
-                const name = parts[0].trim();
-                const amount = parseNumber(parts[parts.length - 2]); // Amount is usually second to last
-                items.push({ name, amount });
+            // Check for known keywords within the payment section
+            if (line.toLowerCase().includes('vale de refeição') || line.toLowerCase().includes('remuneração')) {
+                // Pattern: Name ... Amount ...
+                const parts = line.split(/\s{2,}/).filter(p => p.trim());
+                if (parts.length >= 2) {
+                    const name = parts[0].trim();
+                    // Try to find the amount among the parts
+                    const amountPart = parts.find(p => /[\d\s]+,\d+/.test(p));
+                    if (amountPart) {
+                        items.push({ name, value: parseNumber(amountPart) });
+                    }
+                }
             }
         }
         return items;

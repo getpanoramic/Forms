@@ -72,22 +72,25 @@ export async function parseSalaryPdf(file, onProgress) {
         let inSection = false;
         
         for (let line of lines) {
-            if (line.includes(startKeyword)) {
+            // Flexible matching for start and end keywords
+            if (line.toLowerCase().includes(startKeyword.toLowerCase())) {
                 inSection = true;
                 continue;
             }
-            if (line.includes(endKeyword)) {
+            if (line.toLowerCase().includes(endKeyword.toLowerCase())) {
                 inSection = false;
                 break;
             }
             
             if (inSection && line.trim()) {
-                // Heuristic: Last two or three components are usually numeric
-                const parts = line.split(/\s{2,}/).filter(p => p.trim());
-                if (parts.length >= 2) {
-                    const name = parts[0].trim();
-                    const value = parseNumber(parts[parts.length - 1]);
-                    items.push({ name, value });
+                // Heuristic: Name... Amount. Amount looks like number (possibly with space and comma)
+                // Use a regex to find the last occurrence of a numeric value on the line
+                const numericMatch = line.match(/[\d\s]+,\d+/g);
+                if (numericMatch && numericMatch.length > 0) {
+                    const value = parseNumber(numericMatch[numericMatch.length - 1]);
+                    // Get name by removing the numeric parts
+                    const name = line.replace(numericMatch[numericMatch.length - 1], '').trim();
+                    if (name) items.push({ name, value });
                 }
             }
         }
@@ -97,7 +100,7 @@ export async function parseSalaryPdf(file, onProgress) {
     const parsePagamentos = (text) => {
         // Look for the "Tipo Transf." header, allowing for some flexibility in whitespace
         const startMarker = "Tipo Transf.";
-        const endMarker = "Mês Acumulado";
+        const endMarker = "Assinatura"; // More reliable end marker for this section
         const startIndex = text.indexOf(startMarker);
         if (startIndex === -1) return [];
         const endIndex = text.indexOf(endMarker, startIndex + startMarker.length);
@@ -112,14 +115,10 @@ export async function parseSalaryPdf(file, onProgress) {
             // Check for known keywords within the payment section
             if (line.toLowerCase().includes('vale de refeição') || line.toLowerCase().includes('remuneração')) {
                 // Pattern: Name ... Amount ...
-                const parts = line.split(/\s{2,}/).filter(p => p.trim());
-                if (parts.length >= 2) {
-                    const name = parts[0].trim();
-                    // Try to find the amount among the parts
-                    const amountPart = parts.find(p => /[\d\s]+,\d+/.test(p));
-                    if (amountPart) {
-                        items.push({ name, value: parseNumber(amountPart) });
-                    }
+                const numericMatch = line.match(/[\d\s]+,\d+/);
+                if (numericMatch) {
+                    const name = line.replace(numericMatch[0], '').trim();
+                    items.push({ name, value: parseNumber(numericMatch[0]) });
                 }
             }
         }

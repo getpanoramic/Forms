@@ -132,19 +132,29 @@ export async function parseSalaryPdf(file, onProgress) {
     };
 
     const remuneracoes = parseLineItems(fullText, 'Remunerações', 'Desconto');
-    const descontos = parseLineItems(fullText, 'Desconto', 'Total Ilíquido');
+    const descontos = parseLineItems(fullText, 'Desconto', 'Total'); // Use 'Total' as a more general end marker
     const pagamentos = parsePagamentos(fullText);
     
     console.log(`DEBUG: Extracted Line Items: Remunerações=${remuneracoes.length}, Descontos=${descontos.length}, Pagamentos=${pagamentos.length}`);
 
+    // Derive top-level values from parsed items if necessary
+    const irs = getVal(descontos, 'IRS');
+    const ss = getVal(descontos, 'Segurança Social');
+    const vencimento_base = getVal(remuneracoes, 'Vencimento Base');
+    
+    // Calculate net if not found directly
+    // This is a rough estimation based on the lines found
+    const grossVal = extractValueAfterKeyword(fullText, 'Total Ilíquido');
+    const net = grossVal - irs - ss; // Simplified calculation
+
     const rows = [{
-        date: `${year}-07-31`, // Simplified for now
+        date: `${year}-12-31`, // Simplified for now
         merchant: 'Vencimento',
         amount: net,
-        gross: gross,
-        irs: getVal(descontos, 'IRS'),
-        ss: getVal(descontos, 'Segurança Social'),
-        vencimento_base: getVal(remuneracoes, 'Vencimento Base'),
+        gross: grossVal,
+        irs: irs,
+        ss: ss,
+        vencimento_base: vencimento_base,
         cartao_vale_refeicao: getVal(remuneracoes, 'Cartão/Vale Refeição'),
         isencao_horario: getVal(remuneracoes, 'Isenção de Horário'),
         seguro_saude: getVal(remuneracoes, 'Seguro de Saude'),

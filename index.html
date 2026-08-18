@@ -1007,6 +1007,11 @@ function renderSalaryView(allData) {
         <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Bruto</th>
         <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">IRS</th>
         <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Seg. Soc.</th>
+        <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Venc. Base</th>
+        <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Vale Ref.</th>
+        <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Isenção</th>
+        <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Seg. Saúde</th>
+        <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Pag. Vale</th>
         <th class="p-4 text-right text-[10px] font-black text-gray-400 uppercase">Líquido</th>
     `;
     
@@ -1017,6 +1022,11 @@ function renderSalaryView(allData) {
                 <td class="p-4 text-right font-bold text-gray-800">${(row.gross || 0).toFixed(2)}€</td>
                 <td class="p-4 text-right font-bold text-rose-600">${(row.irs || 0).toFixed(2)}€</td>
                 <td class="p-4 text-right font-bold text-rose-600">${(row.ss || 0).toFixed(2)}€</td>
+                <td class="p-4 text-right font-bold text-gray-800">${(row.vencimento_base || 0).toFixed(2)}€</td>
+                <td class="p-4 text-right font-bold text-gray-800">${(row.cartao_vale_refeicao || 0).toFixed(2)}€</td>
+                <td class="p-4 text-right font-bold text-gray-800">${(row.isencao_horario || 0).toFixed(2)}€</td>
+                <td class="p-4 text-right font-bold text-gray-800">${(row.seguro_saude || 0).toFixed(2)}€</td>
+                <td class="p-4 text-right font-bold text-gray-800">${(row.pagamento_vale_refeicao || 0).toFixed(2)}€</td>
                 <td class="p-4 text-right font-bold text-emerald-600">${(row.amount || 0).toFixed(2)}€</td>
             </tr>
         `);

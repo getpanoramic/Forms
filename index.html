@@ -261,6 +261,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Ensure settings are loaded first to set correct tab
   loadSettings();
   
+  // --- Connection Check ---
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    await fetch('https://rjfjojghtzkccbscwqby.supabase.co/rest/v1/', { 
+      method: 'HEAD',
+      signal: controller.signal 
+    });
+    clearTimeout(timeoutId);
+  } catch (err) {
+    console.error('DEBUG: Supabase unreachable:', err);
+    document.body.insertAdjacentHTML('afterbegin', `
+      <div class="bg-red-600 text-white p-4 text-center font-bold sticky top-0 z-50 shadow-lg">
+        ⚠️ Erro: Não foi possível ligar ao servidor (Supabase). O projeto poderá estar em pausa.
+      </div>
+    `);
+  }
+  
   const { data: { session } } = await supabase.auth.getSession();
   console.log('DEBUG: Session found:', !!session);
   

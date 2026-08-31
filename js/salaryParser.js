@@ -138,22 +138,22 @@ export async function parseSalaryPdf(file, onProgress) {
     console.log(`DEBUG: Extracted Line Items: Remunerações=${remuneracoes.length}, Descontos=${descontos.length}, Pagamentos=${pagamentos.length}`);
 
     // Derive top-level values from parsed items if necessary
-    const irs = getVal(descontos, 'IRS');
-    const ss = getVal(descontos, 'Segurança Social');
+    const irsVal = getVal(descontos, 'IRS');
+    const ssVal = getVal(descontos, 'Segurança Social');
     const vencimento_base = getVal(remuneracoes, 'Vencimento Base');
     
     // Calculate net if not found directly
     // This is a rough estimation based on the lines found
     const grossVal = extractValueAfterKeyword(fullText, 'Total Ilíquido');
-    const net = grossVal - irs - ss; // Simplified calculation
+    const netVal = grossVal - irsVal - ssVal; // Simplified calculation
 
     const rows = [{
         date: `${year}-12-31`, // Simplified for now
         merchant: 'Vencimento',
-        amount: net,
+        amount: netVal,
         gross: grossVal,
-        irs: irs,
-        ss: ss,
+        irs: irsVal,
+        ss: ssVal,
         vencimento_base: vencimento_base,
         cartao_vale_refeicao: getVal(remuneracoes, 'Cartão/Vale Refeição'),
         isencao_horario: getVal(remuneracoes, 'Isenção de Horário'),

@@ -3,6 +3,19 @@ import { SUPABASE_URL, SUPABASE_KEY } from './supabase_config.js';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+export async function loginWithGoogle() {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin + window.location.pathname
+    }
+  });
+  if (error) {
+      console.error('Erro no login:', error);
+      throw error;
+  }
+}
+
 export function subscribeToTransactions(onUpdate) {
   return supabase
     .channel('public:transactions')

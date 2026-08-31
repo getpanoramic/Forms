@@ -197,6 +197,7 @@ import { guessCategory } from './js/dataProcessor.js';
 import { showToast, setLoading } from './js/uiUtils.js';
 import { getExchangeRate } from './js/api.js';
 import { supabase, fetchUserTransactions, subscribeToTransactions } from './js/supabase.js';
+import { loginWithGoogle } from './js/supabase.js';
 import { saveTransactions, getAllTransactions } from './js/db.js';
 import { initCharts } from './js/charts.js';
 import { parsePdf } from './js/pdfParser.js';
@@ -219,15 +220,11 @@ window.appState = {
 // --- Auth Handling (Expose immediately) ---
 async function handleLogin() {
   showToast('A redirecionar para o Google...', 'info');
-  
-  // Construct URL manually to bypass SDK redirect issues
-  const baseUrl = 'https://rjfjojghtzkccbscwqby.supabase.co/auth/v1/authorize';
-  const provider = 'google';
-  const redirectTo = encodeURIComponent(window.location.origin + window.location.pathname);
-  const authUrl = `${baseUrl}?provider=${provider}&redirect_to=${redirectTo}`;
-  
-  console.log('DEBUG: Navigating to:', authUrl);
-  window.open(authUrl, '_blank');
+  try {
+    await loginWithGoogle();
+  } catch (err) {
+    showToast('Erro ao iniciar login: ' + err.message, 'error');
+  }
 }
 window.handleLogin = handleLogin;
 
@@ -256,6 +253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.handleBulkAction = handleBulkAction;
   window.switchTab = switchTab;
   window.saveSettings = saveSettings;
+  window.toggleSection = toggleSection;
 
   // In DOMContentLoaded, fetch from Supabase
   setLoading(true);

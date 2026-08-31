@@ -506,7 +506,7 @@ async function updateCategory(id, category) {
     } else {
         showToast('Categoria atualizada!', 'success');
         window.appState.rawData = await fetchUserTransactions();
-        renderTable();
+        renderTable(window.appState.currentPage);
     }
 }
 
@@ -558,11 +558,12 @@ async function submitRow(btn, date, merchant, amount, category, id) {
       // Keep current page when re-rendering
       renderTable(window.appState.currentPage);
     }
-    setLoading(false);
+    
     btn.innerText = 'Submetido ✅';
     btn.classList.add('bg-emerald-600');
     btn.classList.remove('bg-indigo-600');
     showToast('Transação enviada com sucesso!', 'success');
+    setLoading(false);
   } catch (err) {
     console.error('DEBUG: Submission error:', err);
     setLoading(false);
